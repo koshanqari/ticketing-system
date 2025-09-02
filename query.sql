@@ -14,7 +14,7 @@ DECLARE
     selected_assignee_id UUID;
     min_tickets INTEGER;
 BEGIN
-    -- Find SUPPORT department assignee with minimum active tickets
+    -- Find SUPPORT department assignee with minimum active tickets hello
     WITH support_assignee_stats AS (
         SELECT 
             a.id,
