@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Upload, Send, User, AlertTriangle, Image, X, Video, File } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { TicketFormData, Designation, Panel, IssueTypeL1, DropdownOption } from '@/types'
+import { TicketFormData, Designation, Panel, DropdownOption } from '@/types'
 import { fileUploadService } from '@/lib/fileUpload'
 import { ticketService } from '@/lib/ticketService'
 import { dropdownService } from '@/lib/dropdownService'
@@ -16,6 +16,7 @@ export default function SubmissionForm() {
     designation: '',
     panel: '',
     issue_type_l1: '',
+    issue_type_l2: '',
     description: '',
     attachments: []
   })
@@ -65,7 +66,7 @@ export default function SubmissionForm() {
     e.preventDefault()
     
     // Validate that dropdowns are selected
-    if (!formData.designation || !formData.panel || !formData.issue_type_l1) {
+    if (!formData.designation || !formData.panel || !formData.issue_type_l2) {
       setSubmitError('Please select all required fields (Designation, Panel, and Issue Type).')
       return
     }
@@ -99,6 +100,7 @@ export default function SubmissionForm() {
         designation: '',
         panel: '',
         issue_type_l1: '',
+        issue_type_l2: '',
         description: '',
         attachments: []
       })
@@ -309,14 +311,14 @@ export default function SubmissionForm() {
                   </label>
                   <select
                     required
-                    value={formData.issue_type_l1}
-                    onChange={(e) => handleInputChange('issue_type_l1', e.target.value as IssueTypeL1)}
+                    value={formData.issue_type_l2}
+                    onChange={(e) => handleInputChange('issue_type_l2', e.target.value)}
                     className={`w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white text-gray-900`}
                   >
                     <option value="" disabled className="text-gray-500">
                       Select issue type
                     </option>
-                    {dropdownOptions.issue_type_l1?.map((option) => (
+                    {dropdownOptions.issue_type_l2?.map((option) => (
                       <option key={option.id} value={option.value} className="text-gray-900">
                         {option.value}
                       </option>
@@ -436,8 +438,22 @@ export default function SubmissionForm() {
         </div>
 
         {/* Footer */}
-        <div className="text-center mt-8 text-sm text-gray-500">
-          <p>Need immediate assistance? Contact our support team.</p>
+        <div className="text-center mt-8 text-sm text-gray-500 space-y-2">
+          <p>© 2025 | Greaves Electric Mobility Limited</p>
+          <div className="flex justify-center items-center gap-4 text-xs">
+            <a href="#" className="hover:text-gray-700 transition-colors">Terms & Conditions</a>
+            <a href="#" className="hover:text-gray-700 transition-colors">Privacy Policy</a>
+          </div>
+          <p>
+            GrowthTech Partner - <a 
+              href="https://www.growthjockey.com/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 transition-colors"
+            >
+              Growth Jockey Private Limited
+            </a>
+          </p>
         </div>
       </div>
     </div>

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, phone, ticketId } = await request.json()
+    const { name, phone, ticketId, disposition } = await request.json()
 
     const apiKey = '67d1129cb7401ffd9e886569'
     const apiSecret = '9c22bae06c1149af81fd1f8f59ebab80'
@@ -19,6 +19,63 @@ export async function POST(request: NextRequest) {
 
     const formattedPhone = formatPhoneNumber(phone)
 
+    // Get template name and body values based on disposition
+    const getTemplateConfig = (disposition: string) => {
+      switch (disposition) {
+        case 'New':
+          return {
+            templateName: 'ticket_generated_c1',
+            bodyValues: {
+              Name: name,
+              ticket_id: ticketId
+            }
+          }
+        case 'In Progress':
+          return {
+            templateName: 'ticket_inprof',
+            bodyValues: {
+              Name: name,
+              ticket_id: ticketId
+            }
+          }
+        case 'No Response 1':
+          return {
+            templateName: 'ticket_not_responding_1',
+            bodyValues: {
+              Name: name,
+              ticket_id: ticketId
+            }
+          }
+        case 'Resolved':
+          return {
+            templateName: 'ticket_resolved',
+            bodyValues: {
+              Name: name,
+              ticket_id: ticketId
+            }
+          }
+        case 'No Response 2':
+          return {
+            templateName: 'ticket_not_responding_2',
+            bodyValues: {
+              Name: name,
+              ticket_id: ticketId
+            }
+          }
+        default:
+          // Fallback to original template for backward compatibility
+          return {
+            templateName: 'ticket_generated_c1',
+            bodyValues: {
+              Name: name,
+              ticket_id: ticketId
+            }
+          }
+      }
+    }
+
+    const templateConfig = getTemplateConfig(disposition)
+
     const message = {
       channelId: channelId,
       channelType: 'whatsapp',
@@ -28,13 +85,7 @@ export async function POST(request: NextRequest) {
       },
       whatsapp: {
         type: 'template',
-        template: {
-          templateName: 'ticket_generated_c1',
-          bodyValues: {
-            Name: name,
-            ticket_id: ticketId
-          }
-        }
+        template: templateConfig
       }
     }
 

@@ -55,7 +55,7 @@ Section 1: **Personal Information**
 
 Section 2: **Issue Details**
 - ✅ **Panel** – Dropdown (Goal App, Dealer Panel, CC Panel) with placeholder "Select panel"
-- ✅ **Issue Type** – Dropdown (Tech, Training, General Query) with placeholder "Select issue type"
+- ✅ **Issue Type** – Dropdown showing Issue Type L2 options (child level) with placeholder "Select issue type"
 - ✅ **Description** – Text area for detailed explanation (required) with dark text
 - ✅ **Attachments** – Multiple file upload (Images/Videos) with drag & drop support, file preview, and removal able to upload multiple media files
 
@@ -76,17 +76,19 @@ Section 2: **Issue Details**
 - **Analytics Integration**: Card summary updates based on selected date range
 
 ### High Level Analytics/Summary Cards ✅ IMPLEMENTED
-- **Progress Priority Card**: Shows total count + High/Medium/Low priority breakdown
-- **Resolved Tickets**: Total resolved count with green styling
-- **Parked Priority Card**: Shows total count + High/Medium/Low priority breakdown  
+- **Open Tickets**: Single number card showing total open tickets
+- **Ongoing Tickets**: Shows total count + High/Medium/Low priority breakdown
+- **Resolved Tickets**: Total resolved count with green styling (based on disposition)
+- **Closed Tickets**: Total closed count with gray styling (based on status)
 - **Total Tickets**: Overall ticket count with blue styling
-- **Dropped Tickets**: Total dropped count with red styling
 - **Smart Filtering**: Analytics update based on assignee filter + date range (not other filters)
 
 ### Search & Filter Bar ✅ IMPLEMENTED
 - **Global Search**: Searches across ALL fields (ticket_id, name, phone, email, designation, panel, issue_type_l1, issue_type_l2, description)
 - **Dynamic Dropdowns**: All populated from `ticket_dropdown` table
-  - Status, Priority, Panel, Designation, Issue Type L1, Issue Type L2
+  - Status, Priority, Panel, Designation, Issue Type L1, Issue Type L2, Disposition
+- **Disposition Filter**: New filter for disposition with grouped options (--- Open --- New, etc.)
+- **WhatsApp Indicators**: Green dots (🟢) show which dispositions trigger WhatsApp notifications
 - **Sorting Options**: 
   - Sort by: Created Time, Resolved Time, Ticket ID
   - Sort Order: Ascending/Descending toggle
@@ -97,39 +99,52 @@ Section 2: **Issue Details**
 - **Clickable Rows**: Click any row to open ticket modal (no separate button needed)
 - **Configurable Column Widths**: Easy to adjust from code via `columnWidths` object
 - **Content Wrapping**: All content wraps to next line when exceeding column width
+- **Centered Content**: All columns have centered content for better visual alignment
 - **Column Structure**:
-  1. **Status** (120px): Status + Priority badges bundled together
-  2. **Ticket ID** (130px): Ticket ID format (A-ddmmyy-num)
-  3. **Issue Type** (130px): L1 + L2 bundled, content wraps if needed
-  4. **Time** (130px): Created + Resolved time bundled, content wraps if needed
-  5. **User Details** (200px): Name + Phone + Designation + Email bundled
-  6. **Panel** (120px): Panel name
-  7. **Description** (200px): Limited to 75 characters + "..." if longer
-  8. **Remarks** (200px): Limited to 75 characters + "..." if longer
-  9. **Attachment** (130px): File icons + count display
-  10. **Assigned To** (150px): Assignee name + department
+  1. **Status** (100px): Status + Disposition badges bundled together, centered
+  2. **Priority** (100px): Priority badge or "-" if null, centered
+  3. **Ticket ID** (130px): Ticket ID format (A-ddmmyy-num), centered
+  4. **Issue Type** (130px): L1 + L2 bundled, content wraps if needed, centered
+  5. **Time** (130px): Created + Resolved time bundled, content wraps if needed, centered
+  6. **User Details** (200px): Name + Phone + Designation + Email bundled, centered
+  7. **Panel** (120px): Panel name, centered
+  8. **Description** (200px): Limited to 75 characters + "..." if longer, centered
+  9. **Remarks** (200px): Limited to 75 characters + "..." if longer, centered
+  10. **Attachment** (130px): File icons + count display, centered
+  11. **Assigned To** (150px): Assignee name + department, centered
 
 ### Modal ✅ FULLY EDITABLE & COMPREHENSIVE
 - **Row Click Activation**: Click any table row to open comprehensive modal
 - **Complete Ticket Information**: Displays ALL fields from the ticket table in organized sections
+- **Top Bar Layout**: 
+  - **Left Side**: Save button (moved from bottom)
+  - **Center**: "Saved" success message with checkmark icon
+  - **Right Side**: Close button (X)
+  - **User Information**: Non-editable 2x2 grid (Name | Phone, Designation | Email) in top bar
+  - **Ticket Info**: Ticket ID, Created Time, Status (non-editable badges)
 - **Organized Layout**: 
-  - **Section 1**: Ticket Status & Assignment (Status, Priority, Assigned To)
+  - **Section 1**: Ticket Disposition & Assignment (Disposition, Priority, Assigned To)
   - **Section 2**: Issue Details (Issue Type L1/L2, Panel, Description)
-  - **Section 3**: User Information (Name, Phone, Email, Designation)
-  - **Section 4**: Attachments (File preview with count display)
-  - **Section 5**: Admin Notes & Remarks (Internal comments)
+  - **Section 3**: Attachments (File preview with count display)
+  - **Section 4**: Admin Notes & Remarks (Internal comments)
 - **Editable Fields**: Comprehensive editing capabilities:
-  - ✅ **Fully Editable**: Status, Priority, Assigned To, Issue Type L1, Issue Type L2, Panel, Description, Name, Phone, Email, Designation, Remarks
-  - ❌ **Read-only**: Created Time, Resolved Time, Ticket ID, Attachments
+  - ✅ **Fully Editable**: Disposition, Priority, Assigned To, Issue Type L2, Panel, Description, Remarks
+  - ❌ **Read-only**: Issue Type L1 (auto-set by L2), User Information, Created Time, Resolved Time, Ticket ID, Attachments, Status
 - **Smart Field Types**:
-  - **Dropdowns**: Status, Priority, Issue Type L1, Issue Type L2, Panel, Designation, Assigned To
-  - **Text Inputs**: Name, Phone, Email
+  - **Dropdowns**: Disposition (with WhatsApp indicators 🟢), Priority, Issue Type L2, Panel, Assigned To
   - **Textarea**: Description, Remarks
+- **Parent-Child Relationships**:
+  - **Issue Type L2 → L1**: L1 automatically set based on L2 selection
+  - **Disposition → Status**: Status automatically set based on disposition selection
+- **WhatsApp Integration**:
+  - **Green Dots**: Disposition dropdown shows 🟢 for WhatsApp-triggering options
+  - **Auto-trigger**: WhatsApp sent when disposition changes to: New, In Progress, No Response 1, Resolved, No Response 2
 - **Enhanced UX Features**:
   - **Sticky Header**: Modal header stays visible during scroll
   - **Visual Indicators**: Color-coded section headers with icons
   - **Loading States**: Save button shows loading spinner during updates
-  - **Success Feedback**: Green success message before auto-closing
+  - **Success Feedback**: "Saved" message in top bar with checkmark icon
+  - **No Auto-close**: Modal stays open after saving for continued editing
   - **Proper State Management**: All modal states reset on close
 - **Save Functionality**: Updates saved to database via ticket service with proper error handling
 - **Real-time Updates**: Table refreshes after successful updates
@@ -139,19 +154,23 @@ Section 2: **Issue Details**
 - **State Management**: React hooks for filters, search, sorting, date range
 - **Database Integration**: Supabase for real-time data fetching and updates
 - **Service Layer**: Comprehensive ticketService with full CRUD operations
-  - `updateTicketStatus()` - Update ticket status
+  - `updateTicketDisposition()` - Update ticket disposition and auto-set status
   - `updateTicketPriority()` - Update ticket priority  
   - `assignTicket()` - Assign ticket to team member
-  - `updateTicketIssueTypeL1()` - Update issue type L1
-  - `updateTicketIssueTypeL2()` - Update issue type L2
+  - `updateTicketIssueTypeL2()` - Update issue type L2 and auto-set L1
   - `updateTicketDescription()` - Update ticket description
   - `updateTicketPanel()` - Update panel assignment
-  - `updateTicketUserDetails()` - Update user information (name, phone, email, designation)
   - `updateTicketRemarks()` - Update internal remarks
 - **DropdownService**: Dynamic population of all dropdown options from database
+  - `getParentL1ForL2()` - Get parent L1 for given L2 value
+  - `getParentStatusForDisposition()` - Get parent status for given disposition
+- **WhatsApp Integration**: 
+  - `dispositionWhatsappService` - Separate service for disposition-based WhatsApp notifications
+  - Template mapping for different disposition types
+  - Error handling that doesn't break ticket updates
 - **Admin Authentication**: Basic login system with configurable protection
 - **Responsive Design**: Tailwind CSS with mobile-friendly layouts
-- **Type Safety**: Full TypeScript implementation
+- **Type Safety**: Full TypeScript implementation with updated Status type
 - **Error Handling**: Graceful fallbacks and user feedback
 
 ### Column Width Configuration
@@ -159,7 +178,8 @@ Section 2: **Issue Details**
 - **Current Settings**:
   ```typescript
   const columnWidths = {
-    status: '120px',        // Status + Priority badges
+    status: '100px',        // Status + Disposition badges
+    priority: '100px',      // Priority badge (separate column)
     ticketId: '130px',      // Ticket ID format
     issueType: '130px',     // Issue Type L1 + L2
     time: '130px',          // Created + Resolved time
@@ -172,7 +192,8 @@ Section 2: **Issue Details**
   }
   ```
 - **To Modify**: Simply change the pixel values in the `columnWidths` object
--**Auto-wrapping**: Content automatically wraps to next line when exceeding column width
+- **Auto-wrapping**: Content automatically wraps to next line when exceeding column width
+- **Centered Layout**: All columns have centered content for better visual alignment
 
 
 ## 3. Analytics Panel
@@ -323,6 +344,14 @@ CREATE TABLE admins (
 - **Responsive Design**: Optimized for all screen sizes
 - **Success Feedback**: Prominent ticket ID display with copy functionality
 - **User Guidance**: Clear instructions for saving ticket ID for reference
+- **Centered Table Layout**: All table columns have centered content for better visual alignment
+- **Modal UX Enhancements**:
+  - Save button moved to top bar for better accessibility
+  - "Saved" success message in top bar with checkmark icon
+  - User information displayed as non-editable 2x2 grid in modal header
+  - No auto-close after saving for continued editing
+- **WhatsApp Visual Indicators**: Green dots (🟢) in disposition dropdowns show which options trigger notifications
+- **Status Color Improvements**: Enhanced visibility with darker, more distinct colors for Open, Ongoing, and Closed statuses
 
 ---
 
@@ -369,13 +398,14 @@ CREATE TABLE admins (
 | email         | text       | Optional |
 | designation   | text       | DSO, Dealer, ASM, RSM, ZSM, HQ |
 | panel         | text       | Goal App, Dealer Panel, CC Panel |
-| issue_type_l1 | text       | Tech, Training, General Query |
-| issue_type_l2 | text       | Set by admin |
+| issue_type_l1 | text       | Tech, Training, General Query (auto-set by L2, nullable) |
+| issue_type_l2 | text       | Set by user in submission form |
 | description   | text       | Required |
 | attachments   | text[]     | Array of file URLs stored in Supabase Storage |
-| status        | text       | Progress, Resolved, Parked, Dropped |
-| priority      | text       | Low, Medium, High |
-| assigned_to_id| uuid       | Foreign key to assignees table, Default: Unassigned |
+| status        | text       | Open, Ongoing, Closed (auto-determined by disposition) |
+| disposition   | text       | New, In Progress, Parked, Approval Needed, No Response 1, Resolved, Dropped, No Response 2 |
+| priority      | text       | Low, Medium, High (nullable, set by admin) |
+| assigned_to_id| uuid       | Foreign key to assignees table, Default: Auto-assigned via round-robin |
 | remarks       | text       | Admin notes and internal comments |
 | resolved_time | timestamp  | When status is changed to resolved this time will be updated, if status is changed again, resolved time should be null again |
 
@@ -384,11 +414,19 @@ CREATE TABLE admins (
 | Field         | Type       | Notes      |
 |---------------|-----------|-------------|
 | id            | uuid      | Primary key |
-| dropdown_type | text      | e.g., status, priority, panel, issue_type_l1, issue_type_l2, designation |
-| value         | text      | Dropdown value (e.g., Progress, Resolved, Goal App) |
-| parent_id     | uuid      | Links L2 to L1 if applicable (nullable) |
+| dropdown_type | text      | e.g., status, priority, panel, issue_type_l1, issue_type_l2, designation, disposition |
+| value         | text      | Dropdown value (e.g., Open, Ongoing, Closed, New, In Progress, etc.) |
+| parent_id     | uuid      | Links L2 to L1, disposition to status (nullable) |
 | is_active     | boolean   | To soft-delete/hide values |
+| sort_order    | integer   | Display order for dropdown options |
 | created_at    | timestamp | Auto-generated |
+
+### Parent-Child Relationships
+- **Issue Type L2 → L1**: L2 options have parent_id pointing to L1 option
+- **Disposition → Status**: Disposition options have parent_id pointing to Status option
+  - **Open**: New
+  - **Ongoing**: In Progress, Parked, Approval Needed, No Response 1
+  - **Closed**: Resolved, Dropped, No Response 2
 
 
 ## assignees Table: 
@@ -444,6 +482,20 @@ Notes:
 - **Automatic notifications** sent when tickets are generated ✅
 - **Template-based messaging** with user name and ticket ID ✅
 - **Server-side integration** via Next.js API route ✅
+- **Disposition-based notifications** for specific status changes ✅
+- **Multiple template support** for different disposition types ✅
+
+### 🟢 WhatsApp Disposition Integration
+- **Trigger Dispositions**: New, In Progress, No Response 1, Resolved, No Response 2
+- **Template Mapping**:
+  - **New**: `ticket_generated_c1`
+  - **In Progress**: `ticket_inprof`
+  - **No Response 1**: `ticket_not_responding_1`
+  - **Resolved**: `ticket_resolved`
+  - **No Response 2**: `ticket_not_responding_2`
+- **Visual Indicators**: Green dots (🟢) in disposition dropdowns
+- **Error Handling**: WhatsApp failures don't break ticket updates
+- **Service Architecture**: Separate `dispositionWhatsappService` for clean separation
 
 ### 🎫 Ticket ID System
 - **Format**: `A-ddmmyy-num` (e.g., A-250124-001)
@@ -456,6 +508,17 @@ Notes:
 - **Status Management**: Automatic `resolved_time` updates
 - **File Handling**: Attachment URLs stored as TEXT array
 - **Referential Integrity**: Foreign key relationships maintained
+- **Round Robin Assignment**: `auto_assign_support_ticket()` function for Support department
+- **Parent-Child Logic**: Automatic L1 setting from L2, Status setting from Disposition
+
+### 📊 Database Schema Updates
+- **New Column**: `disposition` added to tickets table
+- **Constraint Changes**: 
+  - `issue_type_l1` made nullable (auto-set by L2)
+  - `status` CHECK constraint removed (auto-determined by disposition)
+  - `priority` made nullable (set by admin)
+- **Dropdown Data**: New status/disposition options added to ticket_dropdown table
+- **Parent-Child Structure**: Implemented for Issue Type L1/L2 and Status/Disposition relationships
 
 ### 📊 Current Database Status
 - **Total Tickets**: 5 sample tickets

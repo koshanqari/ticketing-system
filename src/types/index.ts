@@ -1,7 +1,7 @@
 export type Designation = 'DSO' | 'Dealer' | 'ASM' | 'RSM' | 'ZSM' | 'HQ'
 export type Panel = 'Goal App' | 'Dealer Panel' | 'CC Panel'
 export type IssueTypeL1 = 'Tech' | 'Training' | 'General Query'
-export type Status = 'Progress' | 'Resolved' | 'Parked' | 'Dropped'
+export type Status = 'Open' | 'Ongoing' | 'Closed'
 export type Priority = 'Low' | 'Medium' | 'High'
 
 export interface Ticket {
@@ -17,7 +17,8 @@ export interface Ticket {
   issue_type_l2?: string // Set by admin
   description: string
   attachments: string[] // Array of file URLs stored in Supabase Storage
-  status: Status
+  status: Status // Auto-determined by disposition
+  disposition?: string // Set by admin - determines status
   priority: Priority
   assigned_to_id?: string // Foreign key to assignees table, Default: Auto-assigned
   remarks?: string // Admin notes and internal comments
@@ -44,7 +45,7 @@ export interface Admin {
 // New interface for dropdown management
 export interface DropdownOption {
   id: string
-  dropdown_type: 'status' | 'priority' | 'panel' | 'issue_type_l1' | 'issue_type_l2' | 'designation'
+  dropdown_type: 'status' | 'priority' | 'panel' | 'issue_type_l1' | 'issue_type_l2' | 'designation' | 'disposition'
   value: string
   parent_id?: string
   is_active: boolean
@@ -59,6 +60,7 @@ export interface TicketFormData {
   designation: Designation | ''
   panel: Panel | ''
   issue_type_l1: IssueTypeL1 | ''
+  issue_type_l2: string | ''
   description: string
   attachments: File[]
 }

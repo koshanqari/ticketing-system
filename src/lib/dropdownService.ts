@@ -151,6 +151,86 @@ export class DropdownService {
       throw new Error(`Failed to fetch L2 options: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
+
+  // Get the parent L1 type for a given L2 type
+  async getParentL1ForL2(l2Value: string): Promise<string | null> {
+    try {
+      if (!isSupabaseAvailable()) {
+        throw new Error('Supabase is not configured')
+      }
+
+      // First get the L2 option to find its parent_id
+      const { data: l2Option, error: l2Error } = await supabase!
+        .from('ticket_dropdown')
+        .select('parent_id')
+        .eq('dropdown_type', 'issue_type_l2')
+        .eq('value', l2Value)
+        .eq('is_active', true)
+        .single()
+
+      if (l2Error || !l2Option?.parent_id) {
+        return null
+      }
+
+      // Then get the L1 option value using the parent_id
+      const { data: l1Option, error: l1Error } = await supabase!
+        .from('ticket_dropdown')
+        .select('value')
+        .eq('id', l2Option.parent_id)
+        .eq('dropdown_type', 'issue_type_l1')
+        .eq('is_active', true)
+        .single()
+
+      if (l1Error || !l1Option) {
+        return null
+      }
+
+      return l1Option.value
+    } catch (error) {
+      console.error('Failed to get parent L1 for L2:', error)
+      return null
+    }
+  }
+
+  // Get parent status for a given disposition
+  async getParentStatusForDisposition(dispositionValue: string): Promise<string | null> {
+    try {
+      if (!isSupabaseAvailable()) {
+        throw new Error('Supabase is not configured')
+      }
+
+      // First, get the disposition option to find its parent_id
+      const { data: dispositionOption, error: dispositionError } = await supabase!
+        .from('ticket_dropdown')
+        .select('parent_id')
+        .eq('dropdown_type', 'disposition')
+        .eq('value', dispositionValue)
+        .eq('is_active', true)
+        .single()
+
+      if (dispositionError || !dispositionOption) {
+        return null
+      }
+
+      // Then, get the parent status option using the parent_id
+      const { data: statusOption, error: statusError } = await supabase!
+        .from('ticket_dropdown')
+        .select('value')
+        .eq('id', dispositionOption.parent_id)
+        .eq('dropdown_type', 'status')
+        .eq('is_active', true)
+        .single()
+
+      if (statusError || !statusOption) {
+        return null
+      }
+
+      return statusOption.value
+    } catch (error) {
+      console.error('Failed to get parent status for disposition:', error)
+      return null
+    }
+  }
 }
 
 export const dropdownService = new DropdownService()

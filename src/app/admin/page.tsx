@@ -2,19 +2,44 @@
 
 import { useState, useEffect } from 'react'
 import { Search, BarChart3, CheckCircle, Clock, FileText, Save, X, ChevronDown, Calendar } from 'lucide-react'
-import { Ticket, Assignee, DropdownOption } from '@/types'
+import { Ticket, Assignee, DropdownOption, IssueTypeL1, Status } from '@/types'
 import { ticketService } from '@/lib/ticketService'
 import { dropdownService } from '@/lib/dropdownService'
+import { dispositionWhatsappService } from '@/lib/dispositionWhatsappService'
 import { cn } from '@/lib/utils'
 import AdminProtected from '@/components/AdminProtected'
 
 
 export default function AdminPanel() {
+  // Status color mapping function
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Open':
+        return 'bg-blue-700'
+      case 'Ongoing':
+        return 'bg-orange-600'
+      case 'Closed':
+        return 'bg-gray-600'
+      // Legacy status colors
+      case 'Progress':
+        return 'bg-blue-600'
+      case 'Resolved':
+        return 'bg-green-600'
+      case 'Parked':
+        return 'bg-yellow-600'
+      case 'Dropped':
+        return 'bg-red-600'
+      default:
+        return 'bg-purple-600' // Fallback color
+    }
+  }
+
   // Column width configuration - easily adjustable here
   // To change column widths, simply modify the values below
   // All content will automatically wrap to next line if it exceeds the column width
   const columnWidths = {
-    status: '120px',        // Status + Priority badges
+    status: '100px',        // Status + Disposition badges
+    priority: '100px',       // Priority badge only
     ticketId: '130px',      // Ticket ID format (A-ddmmyy-num)
     issueType: '130px',     // Issue Type L1 + L2
     time: '130px',          // Created + Resolved time
@@ -42,6 +67,7 @@ export default function AdminPanel() {
     designation: '',
     issue_type_l1: '',
     issue_type_l2: '',
+    disposition: '',
     assigned_to: ''
   })
   
@@ -57,6 +83,10 @@ export default function AdminPanel() {
   
   // Date dropdown state
   const [showDateDropdown, setShowDateDropdown] = useState(false)
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(20)
   
   // Admin info state
   const [adminLoginId, setAdminLoginId] = useState<string>('')
@@ -165,7 +195,7 @@ export default function AdminPanel() {
       (ticket.email && ticket.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
       ticket.designation.toLowerCase().includes(searchTerm.toLowerCase()) ||
       ticket.panel.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ticket.issue_type_l1.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (ticket.issue_type_l1 && ticket.issue_type_l1.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (ticket.issue_type_l2 && ticket.issue_type_l2.toLowerCase().includes(searchTerm.toLowerCase())) ||
       ticket.description.toLowerCase().includes(searchTerm.toLowerCase())
     
@@ -176,6 +206,7 @@ export default function AdminPanel() {
       (!filters.designation || ticket.designation === filters.designation) &&
       (!filters.issue_type_l1 || ticket.issue_type_l1 === filters.issue_type_l1) &&
       (!filters.issue_type_l2 || ticket.issue_type_l2 === filters.issue_type_l2) &&
+      (!filters.disposition || ticket.disposition === filters.disposition) &&
       (!filters.assigned_to || ticket.assigned_to_id === filters.assigned_to)
     
     // Filter by date range if dates are selected
@@ -221,6 +252,18 @@ export default function AdminPanel() {
     }
   })
 
+  // Pagination logic
+  const totalTickets = sortedTickets.length
+  const totalPages = Math.ceil(totalTickets / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedTickets = sortedTickets.slice(startIndex, endIndex)
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, filters, dateRange, itemsPerPage])
+
   // Calculate analytics based on assignee filter and date range (not other filters)
   const analyticsTickets = tickets.filter(ticket => {
     // Filter by assignee
@@ -241,10 +284,9 @@ export default function AdminPanel() {
   
   const analytics = {
     total: analyticsTickets.length,
-    progress: analyticsTickets.filter(t => t.status === 'Progress').length,
-    resolved: analyticsTickets.filter(t => t.status === 'Resolved').length,
-    parked: analyticsTickets.filter(t => t.status === 'Parked').length,
-    dropped: analyticsTickets.filter(t => t.status === 'Dropped').length,
+    ongoing: analyticsTickets.filter(t => t.status === 'Ongoing').length,
+    resolved: analyticsTickets.filter(t => t.disposition === 'Resolved').length,
+    closed: analyticsTickets.filter(t => t.status === 'Closed').length,
     highPriority: analyticsTickets.filter(t => t.priority === 'High').length,
     mediumPriority: analyticsTickets.filter(t => t.priority === 'Medium').length,
     lowPriority: analyticsTickets.filter(t => t.priority === 'Low').length
@@ -254,18 +296,35 @@ export default function AdminPanel() {
   const handleTicketUpdate = async (ticketId: string, updates: Partial<Ticket>) => {
     setModalLoading(true)
     try {
-      if (updates.status) {
-        await ticketService.updateTicketStatus(ticketId, updates.status)
+      // Store the original ticket data for WhatsApp
+      const originalTicket = tickets.find(t => t.id === ticketId)
+      
+      if (updates.disposition) {
+        await ticketService.updateTicketDisposition(ticketId, updates.disposition)
+        
+        // Send WhatsApp notification if disposition triggers it
+        if (originalTicket && ['New', 'In Progress', 'No Response 1', 'Resolved', 'No Response 2'].includes(updates.disposition)) {
+          try {
+            await dispositionWhatsappService.sendDispositionNotification(
+              updates.disposition,
+              originalTicket.name,
+              originalTicket.phone,
+              originalTicket.ticket_id
+            )
+            console.log(`WhatsApp notification sent for disposition: ${updates.disposition}`)
+          } catch (whatsappError) {
+            console.error('Failed to send WhatsApp notification:', whatsappError)
+            // Don't fail the entire update if WhatsApp fails
+          }
+        }
       }
-      if (updates.priority) {
+      if (updates.priority !== undefined) {
         await ticketService.updateTicketPriority(ticketId, updates.priority)
       }
       if (updates.assigned_to_id) {
         await ticketService.assignTicket(ticketId, updates.assigned_to_id)
       }
-      if (updates.issue_type_l1) {
-        await ticketService.updateTicketIssueTypeL1(ticketId, updates.issue_type_l1)
-      }
+
       if (updates.issue_type_l2 !== undefined) {
         await ticketService.updateTicketIssueTypeL2(ticketId, updates.issue_type_l2 || '')
       }
@@ -275,14 +334,7 @@ export default function AdminPanel() {
       if (updates.panel) {
         await ticketService.updateTicketPanel(ticketId, updates.panel)
       }
-      if (updates.name || updates.phone || updates.email !== undefined || updates.designation) {
-        await ticketService.updateTicketUserDetails(ticketId, {
-          name: updates.name || selectedTicket!.name,
-          phone: updates.phone || selectedTicket!.phone,
-          email: updates.email !== undefined ? updates.email : selectedTicket!.email,
-          designation: updates.designation || selectedTicket!.designation
-        })
-      }
+
       if (updates.remarks) {
         await ticketService.updateTicketRemarks(ticketId, updates.remarks)
       }
@@ -293,10 +345,10 @@ export default function AdminPanel() {
       
       // Show success message
       setModalSuccess(true)
+      setModalLoading(false) // Reset loading state
       setTimeout(() => {
         setModalSuccess(false)
-        setShowModal(false)
-        setSelectedTicket(null)
+        // Don't auto-close modal - let user close it manually
       }, 1500)
     } catch (error) {
       console.error('Failed to update ticket:', error)
@@ -510,73 +562,26 @@ export default function AdminPanel() {
           
           {/* All Cards in One Row */}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            {/* 1. Progress Priority Breakdown */}
-            <div className="lg:col-span-1.5 bg-white rounded-2xl shadow-sm p-4 border border-gray-200">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-gray-900">In Progress</h3>
-                <div className="flex items-center space-x-2">
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-gray-900">{analytics.progress}</p>
-                  </div>
-                  <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
-                    <Clock className="w-4 h-4 text-yellow-600" />
-                  </div>
-                </div>
-              </div>
-              
-              <div className="flex space-x-2">
-                <div className="flex-1 bg-red-50 rounded-lg p-2 text-center">
-                  <div className="flex items-center justify-center space-x-1 mb-1">
-                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                    <span className="text-xs font-medium text-red-700">High</span>
-                  </div>
-                  <span className="text-2xl font-bold text-red-900">
-                    {analyticsTickets.filter(t => t.status === 'Progress' && t.priority === 'High').length}
-                  </span>
-                </div>
-                
-                <div className="flex-1 bg-orange-50 rounded-lg p-2 text-center">
-                  <div className="flex items-center justify-center space-x-1 mb-1">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                    <span className="text-xs font-medium text-orange-700">Medium</span>
-                  </div>
-                  <span className="text-2xl font-bold text-orange-900">
-                    {analyticsTickets.filter(t => t.status === 'Progress' && t.priority === 'Medium').length}
-                  </span>
-                </div>
-                
-                <div className="flex-1 bg-green-50 rounded-lg p-2 text-center">
-                  <div className="flex items-center justify-center space-x-1 mb-1">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-xs font-medium text-green-700">Low</span>
-                  </div>
-                  <span className="text-2xl font-bold text-green-900">
-                    {analyticsTickets.filter(t => t.status === 'Progress' && t.priority === 'Low').length}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* 2. Resolved Tickets */}
-            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-4 border border-green-200">
+            {/* 1. Open Tickets */}
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-4 border border-blue-200">
               <div className="flex items-center justify-between h-full">
-                <div className="w-16 h-16 bg-green-500 rounded-2xl flex items-center justify-center">
-                  <CheckCircle className="w-8 h-8 text-white" />
+                <div className="w-16 h-16 bg-blue-500 rounded-2xl flex items-center justify-center">
+                  <FileText className="w-8 h-8 text-white" />
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-medium text-green-700">Resolved</p>
-                  <p className="text-4xl font-bold text-green-900">{analytics.resolved}</p>
+                  <p className="text-sm font-medium text-blue-700">Open</p>
+                  <p className="text-4xl font-bold text-blue-900">{analyticsTickets.filter(t => t.status === 'Open').length}</p>
                 </div>
               </div>
             </div>
 
-            {/* 3. Parked Priority Breakdown */}
+            {/* 2. Ongoing Priority Breakdown */}
             <div className="lg:col-span-1.5 bg-white rounded-2xl shadow-sm p-4 border border-gray-200">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-gray-900">Parked</h3>
+                <h3 className="text-sm font-semibold text-gray-900">Ongoing</h3>
                 <div className="flex items-center space-x-2">
                   <div className="text-right">
-                    <p className="text-2xl font-bold text-gray-900">{analytics.parked}</p>
+                    <p className="text-2xl font-bold text-gray-900">{analytics.ongoing}</p>
                   </div>
                   <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
                     <Clock className="w-4 h-4 text-orange-600" />
@@ -591,7 +596,7 @@ export default function AdminPanel() {
                     <span className="text-xs font-medium text-red-700">High</span>
                   </div>
                   <span className="text-2xl font-bold text-red-900">
-                    {analyticsTickets.filter(t => t.status === 'Parked' && t.priority === 'High').length}
+                    {analyticsTickets.filter(t => t.status === 'Ongoing' && t.priority === 'High').length}
                   </span>
                 </div>
                 
@@ -601,7 +606,7 @@ export default function AdminPanel() {
                     <span className="text-xs font-medium text-orange-700">Medium</span>
                   </div>
                   <span className="text-2xl font-bold text-orange-900">
-                    {analyticsTickets.filter(t => t.status === 'Parked' && t.priority === 'Medium').length}
+                    {analyticsTickets.filter(t => t.status === 'Ongoing' && t.priority === 'Medium').length}
                   </span>
                 </div>
                 
@@ -611,13 +616,39 @@ export default function AdminPanel() {
                     <span className="text-xs font-medium text-green-700">Low</span>
                   </div>
                   <span className="text-2xl font-bold text-green-900">
-                    {analyticsTickets.filter(t => t.status === 'Parked' && t.priority === 'Low').length}
+                    {analyticsTickets.filter(t => t.status === 'Ongoing' && t.priority === 'Low').length}
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* 4. Total Tickets */}
+            {/* 3. Resolved Tickets */}
+            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-4 border border-green-200">
+              <div className="flex items-center justify-between h-full">
+                <div className="w-16 h-16 bg-green-500 rounded-2xl flex items-center justify-center">
+                  <CheckCircle className="w-8 h-8 text-white" />
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-medium text-green-700">Resolved</p>
+                  <p className="text-4xl font-bold text-green-900">{analytics.resolved}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* 4. Closed Tickets */}
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-4 border border-gray-200">
+              <div className="flex items-center justify-between h-full">
+                <div className="w-16 h-16 bg-gray-500 rounded-2xl flex items-center justify-center">
+                  <X className="w-8 h-8 text-white" />
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-medium text-gray-700">Closed</p>
+                  <p className="text-4xl font-bold text-gray-900">{analytics.closed}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* 5. Total Tickets */}
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-4 border border-blue-200">
               <div className="flex items-center justify-between h-full">
                 <div className="w-16 h-16 bg-blue-500 rounded-2xl flex items-center justify-center">
@@ -629,19 +660,6 @@ export default function AdminPanel() {
                 </div>
               </div>
             </div>
-
-            {/* 5. Dropped Tickets */}
-            <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-2xl p-4 border border-red-200">
-              <div className="flex items-center justify-between h-full">
-                <div className="w-16 h-16 bg-red-500 rounded-2xl flex items-center justify-center">
-                  <X className="w-8 h-8 text-white" />
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-red-700">Dropped</p>
-                  <p className="text-4xl font-bold text-red-900">{analytics.dropped}</p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -649,9 +667,24 @@ export default function AdminPanel() {
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Filters & Search</h3>
-            <span className="text-sm text-gray-600">
-              Showing {sortedTickets.length} of {tickets.length} tickets
-            </span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600">Show:</label>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                  className="px-2 py-1 border border-gray-300 rounded text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value={20} className="text-gray-900">20</option>
+                  <option value={50} className="text-gray-900">50</option>
+                  <option value={100} className="text-gray-900">100</option>
+                </select>
+                <span className="text-sm text-gray-900 font-medium">per page</span>
+              </div>
+              <span className="text-sm text-gray-900 font-medium">
+                Showing {startIndex + 1}-{Math.min(endIndex, totalTickets)} of {totalTickets} tickets
+              </span>
+            </div>
           </div>
           <div className="flex flex-col lg:flex-row gap-4">
             <div className="flex-1">
@@ -677,6 +710,29 @@ export default function AdminPanel() {
                 {dropdownOptions.status?.map(option => (
                   <option key={option.id} value={option.value}>{option.value}</option>
                 ))}
+              </select>
+
+              <select
+                value={filters.disposition}
+                onChange={(e) => setFilters(prev => ({ ...prev, disposition: e.target.value }))}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+              >
+                <option value="" className="text-gray-500">All Dispositions</option>
+                {dropdownOptions.status?.map(statusOption => {
+                  const statusDispositions = dropdownOptions.disposition?.filter(disp => disp.parent_id === statusOption.id) || []
+                  return (
+                    <optgroup key={statusOption.id} label={`--- ${statusOption.value} ---`}>
+                      {statusDispositions.map(disposition => {
+                        const hasWhatsApp = ['New', 'In Progress', 'No Response 1', 'Resolved', 'No Response 2'].includes(disposition.value)
+                        return (
+                          <option key={disposition.id} value={disposition.value}>
+                            {disposition.value} {hasWhatsApp && '🟢'}
+                          </option>
+                        )
+                      })}
+                    </optgroup>
+                  )
+                })}
               </select>
 
               <select
@@ -733,6 +789,7 @@ export default function AdminPanel() {
                   <option key={option.id} value={option.value}>{option.value}</option>
                 ))}
               </select>
+
             </div>
           </div>
 
@@ -750,6 +807,7 @@ export default function AdminPanel() {
                       designation: '',
                       issue_type_l1: '',
                       issue_type_l2: '',
+                      disposition: '',
                       assigned_to: ''
                     })
                     setSearchTerm('')
@@ -786,62 +844,73 @@ export default function AdminPanel() {
             <table className="w-full" style={{tableLayout: 'fixed'}}>
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: columnWidths.status}}>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: columnWidths.status}}>
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: columnWidths.ticketId}}>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: columnWidths.priority}}>
+                    Priority
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: columnWidths.ticketId}}>
                     Ticket ID
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: columnWidths.issueType}}>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: columnWidths.issueType}}>
                     Issue Type
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: columnWidths.time}}>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: columnWidths.time}}>
                     Time
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: columnWidths.userDetails}}>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: columnWidths.userDetails}}>
                     User Details
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: columnWidths.panel}}>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: columnWidths.panel}}>
                     Panel
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: columnWidths.description}}>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: columnWidths.description}}>
                     Description
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: columnWidths.remarks}}>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: columnWidths.remarks}}>
                     Remarks
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: columnWidths.attachment}}>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: columnWidths.attachment}}>
                     Attachment
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: columnWidths.assignedTo}}>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: columnWidths.assignedTo}}>
                     Assigned To
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {sortedTickets.map((ticket) => (
+                {paginatedTickets.map((ticket) => (
                   <tr 
                     key={ticket.id} 
                     className="hover:bg-gray-50 cursor-pointer"
                     onClick={() => {
                       setSelectedTicket(ticket)
                       setShowModal(true)
+                      setModalLoading(false) // Reset loading state
+                      setModalSuccess(false) // Reset success state
                     }}
                   >
-                    <td className="px-6 py-4" style={{width: columnWidths.status}}>
-                      <div className="space-y-1">
+                    <td className="px-6 py-4 text-center" style={{width: columnWidths.status}}>
+                      <div className="space-y-1 flex flex-col items-center">
                         <span className={cn(
-                          "inline-flex px-2 py-1 text-xs font-medium rounded-full",
-                          {
-                            "bg-blue-100 text-blue-800": ticket.status === "Progress",
-                            "bg-green-100 text-green-800": ticket.status === "Resolved",
-                            "bg-yellow-100 text-yellow-800": ticket.status === "Parked",
-                            "bg-red-100 text-red-800": ticket.status === "Dropped"
-                          }
+                          "inline-flex px-2 py-1 text-xs font-medium rounded-full text-white",
+                          getStatusColor(ticket.status)
                         )}>
                           {ticket.status}
                         </span>
-                        <div>
+                        {ticket.disposition && (
+                          <div>
+                            <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+                              {ticket.disposition}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-center" style={{width: columnWidths.priority}}>
+                      <div className="flex justify-center">
+                        {ticket.priority ? (
                           <span className={cn(
                             "inline-flex px-2 py-1 text-xs font-medium rounded-full",
                             {
@@ -852,24 +921,26 @@ export default function AdminPanel() {
                           )}>
                             {ticket.priority}
                           </span>
-                        </div>
+                        ) : (
+                          <span className="text-sm text-gray-400">-</span>
+                        )}
                       </div>
                     </td>
-                    <td className="px-4 py-4" style={{width: columnWidths.ticketId}}>
+                    <td className="px-4 py-4 text-center" style={{width: columnWidths.ticketId}}>
                       <span className="text-sm font-medium text-gray-900 font-mono">
                         {ticket.ticket_id}
                       </span>
                     </td>
-                    <td className="px-4 py-4" style={{width: columnWidths.issueType}}>
-                      <div>
+                    <td className="px-4 py-4 text-center" style={{width: columnWidths.issueType}}>
+                      <div className="flex flex-col items-center">
                         <div className="text-sm font-medium text-gray-900">{ticket.issue_type_l1}</div>
                         {ticket.issue_type_l2 && (
                           <div className="text-sm text-gray-500">{ticket.issue_type_l2}</div>
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-4" style={{width: columnWidths.time}}>
-                      <div>
+                    <td className="px-4 py-4 text-center" style={{width: columnWidths.time}}>
+                      <div className="flex flex-col items-center">
                         <div className="text-sm font-medium text-gray-900">
                           {new Date(ticket.created_time).toLocaleDateString()}
                         </div>
@@ -880,8 +951,8 @@ export default function AdminPanel() {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4" style={{width: columnWidths.userDetails}}>
-                      <div>
+                    <td className="px-6 py-4 text-center" style={{width: columnWidths.userDetails}}>
+                      <div className="flex flex-col items-center">
                         <div className="text-sm font-medium text-gray-900">{ticket.name}</div>
                         <div className="text-sm text-gray-500">{ticket.phone}</div>
                         <div className="text-sm text-gray-500">{ticket.designation}</div>
@@ -890,10 +961,10 @@ export default function AdminPanel() {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900" style={{width: columnWidths.panel}}>
+                    <td className="px-6 py-4 text-center text-sm text-gray-900" style={{width: columnWidths.panel}}>
                       {ticket.panel}
                     </td>
-                    <td className="px-6 py-4" style={{width: columnWidths.description}}>
+                    <td className="px-6 py-4 text-center" style={{width: columnWidths.description}}>
                       <div className="text-sm text-gray-900">
                         {ticket.description.length > 75 
                           ? `${ticket.description.substring(0, 75)}...` 
@@ -901,7 +972,7 @@ export default function AdminPanel() {
                         }
                       </div>
                     </td>
-                    <td className="px-6 py-4" style={{width: columnWidths.remarks}}>
+                    <td className="px-6 py-4 text-center" style={{width: columnWidths.remarks}}>
                       <div className="text-sm text-gray-900">
                         {ticket.remarks && ticket.remarks.length > 75 
                           ? `${ticket.remarks.substring(0, 75)}...` 
@@ -909,9 +980,9 @@ export default function AdminPanel() {
                         }
                       </div>
                     </td>
-                    <td className="px-6 py-4" style={{width: columnWidths.attachment}}>
+                    <td className="px-6 py-4 text-center" style={{width: columnWidths.attachment}}>
                       {ticket.attachments && ticket.attachments.length > 0 ? (
-                        <div className="flex space-x-1">
+                        <div className="flex justify-center space-x-1">
                           {ticket.attachments.slice(0, 2).map((attachment, index) => (
                             <div key={index} className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
                               <FileText className="w-4 h-4 text-gray-600" />
@@ -925,9 +996,9 @@ export default function AdminPanel() {
                         <span className="text-sm text-gray-400">No files</span>
                       )}
                     </td>
-                    <td className="px-6 py-4" style={{width: columnWidths.assignedTo}}>
+                    <td className="px-6 py-4 text-center" style={{width: columnWidths.assignedTo}}>
                       {ticket.assigned_to_id ? (
-                        <div>
+                        <div className="flex flex-col items-center">
                           <div className="text-sm font-medium text-gray-900">
                             {assignees.find(a => a.id === ticket.assigned_to_id)?.name || 'Unknown'}
                           </div>
@@ -946,7 +1017,65 @@ export default function AdminPanel() {
           </div>
         </div>
 
-        {sortedTickets.length === 0 && (
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 mt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`px-3 py-2 text-sm font-medium rounded-lg ${
+                          currentPage === pageNum
+                            ? 'bg-blue-600 text-white'
+                            : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+              
+              <div className="text-sm text-gray-600">
+                Page {currentPage} of {totalPages}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {totalTickets === 0 && (
           <div className="text-center py-12">
             <p className="text-gray-500">No tickets found matching your criteria.</p>
           </div>
@@ -958,64 +1087,178 @@ export default function AdminPanel() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl shadow-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-xl">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <FileText className="w-5 h-5 text-blue-600" />
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-6 rounded-t-xl">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start space-x-8 flex-1">
+                  {/* Ticket Info */}
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                      <FileText className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-900">
+                        {selectedTicket.ticket_id}
+                      </h2>
+                      <div className="flex items-center space-x-4 mt-1">
+                        <p className="text-sm text-gray-500">
+                          Created: {new Date(selectedTicket.created_time).toLocaleDateString()}
+                        </p>
+                        {selectedTicket.resolved_time && (
+                          <p className="text-sm text-gray-500">
+                            Resolved: {new Date(selectedTicket.resolved_time).toLocaleDateString()}
+                          </p>
+                        )}
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm text-gray-500">Status:</span>
+                          <span className={cn(
+                            "inline-flex px-2 py-1 text-xs font-medium rounded-full text-white",
+                            getStatusColor(selectedTicket.status)
+                          )}>
+                            {selectedTicket.status}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900">
-                      Ticket: {selectedTicket.ticket_id}
-                    </h2>
-                    <p className="text-sm text-gray-500">
-                      Created: {new Date(selectedTicket.created_time).toLocaleString()}
-                      {selectedTicket.resolved_time && ` • Resolved: ${new Date(selectedTicket.resolved_time).toLocaleString()}`}
-                    </p>
+                  
+                  {/* User Details - Non-editable */}
+                  <div className="border-l border-gray-200 pl-8">
+                    <div className="grid grid-cols-2 gap-y-3">
+                      <div>
+                        <p className="text-sm text-gray-900 font-medium">{selectedTicket.name}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-900 font-medium">{selectedTicket.phone}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-900 font-medium">{selectedTicket.designation}</p>
+                      </div>
+                      <div>
+                        {selectedTicket.email && (
+                          <p className="text-sm text-gray-900 font-medium">{selectedTicket.email}</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => {
-                    setShowModal(false)
-                    setSelectedTicket(null)
-                    setModalLoading(false)
-                    setModalSuccess(false)
-                  }}
-                  className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                
+                {/* Action Buttons */}
+                <div className="flex items-center space-x-3">
+                  {/* Success Message */}
+                  {modalSuccess && (
+                    <div className="flex items-center px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
+                      <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
+                      <span className="text-green-800 font-medium text-sm">Saved</span>
+                    </div>
+                  )}
+
+                  {/* Save Button */}
+                  <button
+                    onClick={() => handleTicketUpdate(selectedTicket.id, {
+                      disposition: selectedTicket.disposition,
+                      priority: selectedTicket.priority,
+                      assigned_to_id: selectedTicket.assigned_to_id,
+                      issue_type_l2: selectedTicket.issue_type_l2,
+                      description: selectedTicket.description,
+                      panel: selectedTicket.panel,
+                      remarks: selectedTicket.remarks
+                    })}
+                    disabled={modalLoading}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {modalLoading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        Save
+                      </>
+                    )}
+                  </button>
+
+                  {/* Close Button */}
+                  <button
+                    onClick={() => {
+                      setShowModal(false)
+                      setSelectedTicket(null)
+                      setModalLoading(false)
+                      setModalSuccess(false)
+                    }}
+                    className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors flex-shrink-0"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
             </div>
 
             <div className="p-6">
-              {/* Section 1: Ticket Status & Assignment */}
+              {/* Section 1: Ticket Disposition & Assignment */}
               <div className="mb-8">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                   <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
-                  Ticket Status & Assignment
+                  Ticket Disposition & Assignment
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Disposition</label>
                     <select
-                      value={selectedTicket.status}
-                      onChange={(e) => setSelectedTicket(prev => prev ? { ...prev, status: e.target.value as Ticket['status'] } : null)}
+                      value={selectedTicket.disposition || ''}
+                      onChange={async (e) => {
+                        const dispositionValue = e.target.value
+                        
+                        // Automatically set status based on disposition selection
+                        if (dispositionValue) {
+                          try {
+                            const parentStatus = await dropdownService.getParentStatusForDisposition(dispositionValue)
+                            // Update both disposition and status in a single state update
+                            setSelectedTicket(prev => prev ? { 
+                              ...prev, 
+                              disposition: dispositionValue,
+                              status: (parentStatus as Status) || prev.status
+                            } : null)
+                          } catch (error) {
+                            console.error('Failed to get parent status:', error)
+                            // If error, just update disposition
+                            setSelectedTicket(prev => prev ? { ...prev, disposition: dispositionValue } : null)
+                          }
+                        } else {
+                          // If no disposition selected, just update disposition
+                          setSelectedTicket(prev => prev ? { ...prev, disposition: dispositionValue } : null)
+                        }
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
                     >
-                      {dropdownOptions.status?.map(option => (
-                        <option key={option.id} value={option.value}>{option.value}</option>
-                      ))}
+                      <option value="" className="text-gray-500">Select Disposition</option>
+                      {dropdownOptions.status?.map(statusOption => {
+                        const statusDispositions = dropdownOptions.disposition?.filter(disp => disp.parent_id === statusOption.id) || []
+                        return (
+                          <optgroup key={statusOption.id} label={`--- ${statusOption.value} ---`}>
+                            {statusDispositions.map(disposition => {
+                              const hasWhatsApp = ['New', 'In Progress', 'No Response 1', 'Resolved', 'No Response 2'].includes(disposition.value)
+                              return (
+                                <option key={disposition.id} value={disposition.value}>
+                                  {disposition.value} {hasWhatsApp && '🟢'}
+                                </option>
+                              )
+                            })}
+                          </optgroup>
+                        )
+                      })}
                     </select>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
                     <select
-                      value={selectedTicket.priority}
+                      value={selectedTicket.priority || ''}
                       onChange={(e) => setSelectedTicket(prev => prev ? { ...prev, priority: e.target.value as Ticket['priority'] } : null)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
                     >
+                      <option value="" className="text-gray-500">Select Priority</option>
                       {dropdownOptions.priority?.map(option => (
                         <option key={option.id} value={option.value}>{option.value}</option>
                       ))}
@@ -1049,22 +1292,41 @@ export default function AdminPanel() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Issue Type L1</label>
-                    <select
-                      value={selectedTicket.issue_type_l1}
-                      onChange={(e) => setSelectedTicket(prev => prev ? { ...prev, issue_type_l1: e.target.value as Ticket['issue_type_l1'] } : null)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
-                    >
-                      {dropdownOptions.issue_type_l1?.map(option => (
-                        <option key={option.id} value={option.value}>{option.value}</option>
-                      ))}
-                    </select>
+                    <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-600">
+                      {selectedTicket.issue_type_l1 || 'Auto-selected based on L2'}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Automatically determined by Issue Type L2 selection
+                    </p>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Issue Type L2</label>
                     <select
                       value={selectedTicket.issue_type_l2 || ''}
-                      onChange={(e) => setSelectedTicket(prev => prev ? { ...prev, issue_type_l2: e.target.value } : null)}
+                      onChange={async (e) => {
+                        const l2Value = e.target.value
+                        
+                        // Automatically set L1 based on L2 selection
+                        if (l2Value) {
+                          try {
+                            const parentL1 = await dropdownService.getParentL1ForL2(l2Value)
+                            // Update both L2 and L1 in a single state update
+                            setSelectedTicket(prev => prev ? { 
+                              ...prev, 
+                              issue_type_l2: l2Value,
+                              issue_type_l1: (parentL1 as IssueTypeL1) || prev.issue_type_l1
+                            } : null)
+                          } catch (error) {
+                            console.error('Failed to get parent L1:', error)
+                            // If error, just update L2
+                            setSelectedTicket(prev => prev ? { ...prev, issue_type_l2: l2Value } : null)
+                          }
+                        } else {
+                          // If no L2 selected, just update L2
+                          setSelectedTicket(prev => prev ? { ...prev, issue_type_l2: l2Value } : null)
+                        }
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
                     >
                       <option value="" className="text-gray-500">Select Issue Type L2</option>
@@ -1100,62 +1362,9 @@ export default function AdminPanel() {
                 </div>
               </div>
 
-                            {/* Section 3: User Information */}
-              <div className="mb-8">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full mr-3"></div>
-                  User Information
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
-                    <input
-                      type="text"
-                      value={selectedTicket.name}
-                      onChange={(e) => setSelectedTicket(prev => prev ? { ...prev, name: e.target.value } : null)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
-                      placeholder="Enter user name"
-                    />
-                  </div>
+              
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
-                    <input
-                      type="text"
-                      value={selectedTicket.phone}
-                      onChange={(e) => setSelectedTicket(prev => prev ? { ...prev, phone: e.target.value } : null)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
-                      placeholder="Enter phone number"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                    <input
-                      type="text"
-                      value={selectedTicket.email || ''}
-                      onChange={(e) => setSelectedTicket(prev => prev ? { ...prev, email: e.target.value } : null)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
-                      placeholder="Enter email address"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Designation</label>
-                    <select
-                      value={selectedTicket.designation}
-                      onChange={(e) => setSelectedTicket(prev => prev ? { ...prev, designation: e.target.value as Ticket['designation'] } : null)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
-                    >
-                      {dropdownOptions.designation?.map(option => (
-                        <option key={option.id} value={option.value}>{option.value}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Section 4: Attachments */}
+              {/* Section 3: Attachments */}
               {selectedTicket.attachments && selectedTicket.attachments.length > 0 && (
                 <div className="mb-8">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
@@ -1177,7 +1386,7 @@ export default function AdminPanel() {
                 </div>
               )}
 
-              {/* Section 5: Admin Notes */}
+              {/* Section 4: Admin Notes */}
               <div className="mb-8">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                   <div className="w-2 h-2 bg-red-500 rounded-full mr-3"></div>
@@ -1198,63 +1407,9 @@ export default function AdminPanel() {
                 </div>
               </div>
 
-              {/* Success Message */}
-              {modalSuccess && (
-                <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center">
-                    <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
-                    <span className="text-green-800 font-medium">
-                      Ticket updated successfully! Closing modal...
-                    </span>
-                  </div>
-                </div>
-              )}
 
-              {/* Action Buttons */}
-              <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-                <button
-                  onClick={() => {
-                    setShowModal(false)
-                    setSelectedTicket(null)
-                    setModalLoading(false)
-                    setModalSuccess(false)
-                  }}
-                  disabled={modalLoading}
-                  className="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleTicketUpdate(selectedTicket.id, {
-                    status: selectedTicket.status,
-                    priority: selectedTicket.priority,
-                    assigned_to_id: selectedTicket.assigned_to_id,
-                    issue_type_l1: selectedTicket.issue_type_l1,
-                    issue_type_l2: selectedTicket.issue_type_l2,
-                    description: selectedTicket.description,
-                    panel: selectedTicket.panel,
-                    name: selectedTicket.name,
-                    phone: selectedTicket.phone,
-                    email: selectedTicket.email,
-                    designation: selectedTicket.designation,
-                    remarks: selectedTicket.remarks
-                  })}
-                  disabled={modalLoading}
-                  className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {modalLoading ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Changes
-                    </>
-                  )}
-                </button>
-              </div>
+
+
             </div>
           </div>
         </div>
