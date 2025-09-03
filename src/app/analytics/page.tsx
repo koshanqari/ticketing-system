@@ -73,10 +73,10 @@ export default function AnalyticsPanel() {
 
     return {
       total: filteredTickets.length,
-      progress: filteredTickets.filter(t => t.status === 'Progress').length,
-      resolved: filteredTickets.filter(t => t.status === 'Resolved').length,
-      parked: filteredTickets.filter(t => t.status === 'Parked').length,
-      dropped: filteredTickets.filter(t => t.status === 'Dropped').length,
+      open: filteredTickets.filter(t => t.status === 'Open').length,
+      ongoing: filteredTickets.filter(t => t.status === 'Ongoing').length,
+      resolved: filteredTickets.filter(t => t.disposition === 'Resolved').length,
+      closed: filteredTickets.filter(t => t.status === 'Closed').length,
       highPriority: filteredTickets.filter(t => t.priority === 'High').length,
       mediumPriority: filteredTickets.filter(t => t.priority === 'Medium').length,
       lowPriority: filteredTickets.filter(t => t.priority === 'Low').length,
@@ -100,14 +100,14 @@ export default function AnalyticsPanel() {
   const previousPeriodData = {
     total: Math.floor(analytics.total * 0.9),
     resolved: Math.floor(analytics.resolved * 0.85),
-    progress: Math.floor(analytics.progress * 1.1),
+    ongoing: Math.floor(analytics.ongoing * 1.1),
     highPriority: Math.floor(analytics.highPriority * 0.95)
   }
 
   const trends = {
     total: calculateTrend(analytics.total, previousPeriodData.total),
     resolved: calculateTrend(analytics.resolved, previousPeriodData.resolved),
-    progress: calculateTrend(analytics.progress, previousPeriodData.progress),
+    ongoing: calculateTrend(analytics.ongoing, previousPeriodData.ongoing),
     highPriority: calculateTrend(analytics.highPriority, previousPeriodData.highPriority)
   }
 
@@ -246,19 +246,19 @@ export default function AnalyticsPanel() {
           <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">In Progress</p>
-                <p className="text-3xl font-bold text-gray-900">{analytics.progress}</p>
+                <p className="text-sm font-medium text-gray-600">Ongoing</p>
+                <p className="text-3xl font-bold text-gray-900">{analytics.ongoing}</p>
                 <div className="flex items-center mt-2">
-                  {trends.progress.isPositive ? (
+                  {trends.ongoing.isPositive ? (
                     <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
                   ) : (
                     <TrendingDown className="w-4 h-4 text-red-500 mr-1" />
                   )}
                   <span className={cn(
                     "text-sm",
-                    trends.progress.isPositive ? "text-green-600" : "text-red-600"
+                    trends.ongoing.isPositive ? "text-green-600" : "text-red-600"
                   )}>
-                    {trends.progress.value.toFixed(1)}% from last period
+                    {trends.ongoing.value.toFixed(1)}% from last period
                   </span>
                 </div>
               </div>
@@ -304,10 +304,10 @@ export default function AnalyticsPanel() {
             </h3>
             <div className="space-y-3">
               {Object.entries({
-                'In Progress': analytics.progress,
+                'Open': analytics.open,
+                'Ongoing': analytics.ongoing,
                 'Resolved': analytics.resolved,
-                'Parked': analytics.parked,
-                'Dropped': analytics.dropped
+                'Closed': analytics.closed
               }).map(([status, count]) => (
                 <div key={status} className="flex items-center justify-between">
                   <span className="text-sm font-medium text-gray-700">{status}</span>
@@ -317,10 +317,10 @@ export default function AnalyticsPanel() {
                         className={cn(
                           "h-2 rounded-full",
                           {
-                            "bg-blue-500": status === 'In Progress',
+                            "bg-blue-500": status === 'Open',
+                            "bg-orange-500": status === 'Ongoing',
                             "bg-green-500": status === 'Resolved',
-                            "bg-yellow-500": status === 'Parked',
-                            "bg-red-500": status === 'Dropped'
+                            "bg-gray-500": status === 'Closed'
                           }
                         )}
                         style={{ width: `${analytics.total > 0 ? (count / analytics.total) * 100 : 0}%` }}
@@ -426,7 +426,7 @@ export default function AnalyticsPanel() {
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600 mb-2">
-                {analytics.total > 0 ? ((analytics.progress / analytics.total) * 100).toFixed(1) : 0}%
+                {analytics.total > 0 ? ((analytics.ongoing / analytics.total) * 100).toFixed(1) : 0}%
               </div>
               <p className="text-sm text-gray-600">Active Rate</p>
             </div>

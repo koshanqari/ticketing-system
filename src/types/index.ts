@@ -75,10 +75,10 @@ export interface FileUploadProgress {
 // New interface for analytics data
 export interface TicketAnalytics {
   total: number
-  progress: number
+  open: number
+  ongoing: number
   resolved: number
-  parked: number
-  dropped: number
+  closed: number
   highPriority: number
   mediumPriority: number
   lowPriority: number
