@@ -453,7 +453,7 @@ export default function SubmissionForm() {
             >
               Growth Jockey Private Limited
             </a>
-          </p>d
+          </p>
         </div>
       </div>
     </div>

@@ -36,6 +36,16 @@ export class AwsS3Service {
    */
   async uploadFile(file: File, key: string, contentType?: string): Promise<string> {
     try {
+      console.log('Starting S3 upload:', {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        s3Key: key,
+        bucketName: this.bucketName,
+        region: process.env.AWS_REGION || 'ap-south-1',
+        timestamp: new Date().toISOString()
+      });
+
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
@@ -51,12 +61,25 @@ export class AwsS3Service {
         },
       });
 
+      console.log('Sending PutObjectCommand to S3...');
       await this.s3Client.send(command);
+      console.log('S3 upload successful for key:', key);
       
       // Return the public URL
-      return `https://${this.bucketName}.s3.${process.env.AWS_REGION || 'ap-south-1'}.amazonaws.com/${key}`;
+      const url = `https://${this.bucketName}.s3.${process.env.AWS_REGION || 'ap-south-1'}.amazonaws.com/${key}`;
+      console.log('Generated S3 URL:', url);
+      return url;
     } catch (error) {
-      console.error('Error uploading file to S3:', error);
+      console.error('S3 Upload Error Details:', {
+        error: error,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        errorCode: (error as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode,
+        errorName: (error as { name?: string })?.name,
+        fileName: file.name,
+        s3Key: key,
+        bucketName: this.bucketName,
+        timestamp: new Date().toISOString()
+      });
       throw new Error(`Failed to upload file: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }

@@ -53,12 +53,13 @@ export class TicketService {
             throw new Error(errorMessage)
           }
 
+          // Parse the successful response
           let uploadData;
           try {
             uploadData = await uploadResponse.json()
-          } catch {
-            const responseText = await uploadResponse.text()
-            throw new Error(`Invalid response from upload API: ${responseText}`)
+          } catch (parseError) {
+            console.error('Failed to parse upload response as JSON:', parseError)
+            throw new Error('Invalid response from upload API - not valid JSON')
           }
           attachments = uploadData.data.map((result: {
             uuid: string;
