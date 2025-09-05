@@ -30,35 +30,82 @@ export class TicketService {
         try {
           // Create FormData for API request
           const uploadFormData = new FormData()
-          formData.attachments.forEach(file => {
+          console.log('Creating FormData for files:', {
+            fileCount: formData.attachments.length,
+            fileNames: formData.attachments.map(f => f.name),
+            fileSizes: formData.attachments.map(f => f.size),
+            fileTypes: formData.attachments.map(f => f.type)
+          })
+          
+          formData.attachments.forEach((file, index) => {
+            console.log(`Adding file ${index + 1} to FormData:`, {
+              name: file.name,
+              size: file.size,
+              type: file.type
+            })
             uploadFormData.append('files', file)
           })
 
           // Upload files via API route
-          const uploadResponse = await fetch('/api/upload-files', {
-            method: 'POST',
-            body: uploadFormData,
+          console.log('Starting file upload to /api/upload-files...')
+          let uploadResponse;
+          try {
+            uploadResponse = await fetch('/api/upload-files', {
+              method: 'POST',
+              body: uploadFormData,
+              // Add timeout for multiple file uploads
+              signal: AbortSignal.timeout(60000) // 60 seconds timeout
+            })
+          } catch (fetchError) {
+            console.error('Fetch error during upload:', fetchError)
+            if (fetchError instanceof Error && fetchError.name === 'TimeoutError') {
+              throw new Error('File upload timed out. Please try with fewer files or smaller file sizes.')
+            }
+            throw new Error(`Network error during file upload: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`)
+          }
+
+          console.log('Upload response received:', {
+            ok: uploadResponse.ok,
+            status: uploadResponse.status,
+            statusText: uploadResponse.statusText,
+            headers: Object.fromEntries(uploadResponse.headers.entries()),
+            bodyUsed: uploadResponse.bodyUsed
           })
 
+          // Clone the response to avoid body stream issues in Vercel
+          const responseClone = uploadResponse.clone()
+          
           if (!uploadResponse.ok) {
+            console.log('Upload failed, processing error response...')
             let errorMessage = 'Upload failed';
             try {
-              const errorData = await uploadResponse.json()
+              console.log('Attempting to read error response as JSON...')
+              const errorData = await responseClone.json()
+              console.log('Error data parsed:', errorData)
               errorMessage = errorData.message || errorData.details || 'Upload failed'
-            } catch {
-              // If response is not JSON, get text
-              const errorText = await uploadResponse.text()
-              errorMessage = `Upload failed: ${errorText}`
+            } catch (jsonError) {
+              console.log('Failed to parse error as JSON, trying text...', jsonError)
+              try {
+                const errorText = await responseClone.text()
+                console.log('Error text:', errorText)
+                errorMessage = `Upload failed: ${errorText}`
+              } catch (textError) {
+                console.log('Failed to read error as text:', textError)
+                errorMessage = `Upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`
+              }
             }
             throw new Error(errorMessage)
           }
 
           // Parse the successful response
+          console.log('Upload successful, parsing response...')
           let uploadData;
           try {
             uploadData = await uploadResponse.json()
+            console.log('Upload data parsed successfully:', uploadData)
           } catch (parseError) {
             console.error('Failed to parse upload response as JSON:', parseError)
+            console.log('Response body used:', uploadResponse.bodyUsed)
             throw new Error('Invalid response from upload API - not valid JSON')
           }
           attachments = uploadData.data.map((result: {
