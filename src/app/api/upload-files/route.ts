@@ -58,10 +58,10 @@ export async function POST(request: NextRequest) {
     console.log(`Uploading ${files.length} files to S3...`);
     const s3Service = new S3FileUploadService();
     
-    // Upload files one by one to avoid potential issues with parallel uploads
+    // Upload files - now optimized for single file uploads from frontend
     const results = [];
     for (let i = 0; i < files.length; i++) {
-      console.log(`Uploading file ${i + 1}/${files.length}: ${files[i].name}`);
+      console.log(`Uploading file ${i + 1}/${files.length}: ${files[i].name} (${(files[i].size / 1024).toFixed(1)} KB)`);
       try {
         const result = await s3Service.uploadFile(files[i]);
         results.push(result);

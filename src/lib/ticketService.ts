@@ -24,111 +24,74 @@ export class TicketService {
         }
       }
 
-      // Handle file uploads to S3 via API route
-      let attachments = []
+      // Handle file uploads to S3 via API route - upload one by one to avoid Vercel 413 Payload Too Large error
+      const attachments = []
       if (formData.attachments && formData.attachments.length > 0) {
-        try {
-          // Create FormData for API request
-          const uploadFormData = new FormData()
-          console.log('Creating FormData for files:', {
-            fileCount: formData.attachments.length,
-            fileNames: formData.attachments.map(f => f.name),
-            fileSizes: formData.attachments.map(f => f.size),
-            fileTypes: formData.attachments.map(f => f.type)
-          })
-          
-          formData.attachments.forEach((file, index) => {
-            console.log(`Adding file ${index + 1} to FormData:`, {
-              name: file.name,
-              size: file.size,
-              type: file.type
-            })
-            uploadFormData.append('files', file)
-          })
+        console.log('Starting individual file uploads to avoid Vercel payload limits:', {
+          fileCount: formData.attachments.length,
+          totalSize: formData.attachments.reduce((sum, f) => sum + f.size, 0),
+          fileNames: formData.attachments.map(f => f.name)
+        })
 
-          // Upload files via API route
-          console.log('Starting file upload to /api/upload-files...')
-          let uploadResponse;
+        // Upload files one by one to avoid Vercel 413 Payload Too Large error
+        for (let i = 0; i < formData.attachments.length; i++) {
+          const file = formData.attachments[i]
+          console.log(`Uploading file ${i + 1}/${formData.attachments.length}: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`)
+          
           try {
-            uploadResponse = await fetch('/api/upload-files', {
+            // Create FormData for single file
+            const uploadFormData = new FormData()
+            uploadFormData.append('files', file)
+
+            // Upload single file via API route
+            const uploadResponse = await fetch('/api/upload-files', {
               method: 'POST',
               body: uploadFormData,
-              // Add timeout for multiple file uploads
-              signal: AbortSignal.timeout(60000) // 60 seconds timeout
+              signal: AbortSignal.timeout(30000) // 30 seconds per file
             })
-          } catch (fetchError) {
-            console.error('Fetch error during upload:', fetchError)
-            if (fetchError instanceof Error && fetchError.name === 'TimeoutError') {
-              throw new Error('File upload timed out. Please try with fewer files or smaller file sizes.')
-            }
-            throw new Error(`Network error during file upload: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`)
-          }
 
-          console.log('Upload response received:', {
-            ok: uploadResponse.ok,
-            status: uploadResponse.status,
-            statusText: uploadResponse.statusText,
-            headers: Object.fromEntries(uploadResponse.headers.entries()),
-            bodyUsed: uploadResponse.bodyUsed
-          })
+            console.log(`File ${i + 1} upload response:`, {
+              ok: uploadResponse.ok,
+              status: uploadResponse.status,
+              statusText: uploadResponse.statusText
+            })
 
-          // Clone the response to avoid body stream issues in Vercel
-          const responseClone = uploadResponse.clone()
-          
-          if (!uploadResponse.ok) {
-            console.log('Upload failed, processing error response...')
-            let errorMessage = 'Upload failed';
-            try {
-              console.log('Attempting to read error response as JSON...')
-              const errorData = await responseClone.json()
-              console.log('Error data parsed:', errorData)
-              errorMessage = errorData.message || errorData.details || 'Upload failed'
-            } catch (jsonError) {
-              console.log('Failed to parse error as JSON, trying text...', jsonError)
+            if (!uploadResponse.ok) {
+              let errorMessage = `Upload failed for ${file.name}`;
               try {
-                const errorText = await responseClone.text()
-                console.log('Error text:', errorText)
-                errorMessage = `Upload failed: ${errorText}`
-              } catch (textError) {
-                console.log('Failed to read error as text:', textError)
-                errorMessage = `Upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`
+                const errorData = await uploadResponse.json()
+                errorMessage = errorData.message || errorData.details || errorMessage
+              } catch {
+                const errorText = await uploadResponse.text()
+                errorMessage = `${errorMessage}: ${errorText}`
               }
+              throw new Error(errorMessage)
             }
-            throw new Error(errorMessage)
-          }
 
-          // Parse the successful response
-          console.log('Upload successful, parsing response...')
-          let uploadData;
-          try {
-            uploadData = await uploadResponse.json()
-            console.log('Upload data parsed successfully:', uploadData)
-          } catch (parseError) {
-            console.error('Failed to parse upload response as JSON:', parseError)
-            console.log('Response body used:', uploadResponse.bodyUsed)
-            throw new Error('Invalid response from upload API - not valid JSON')
+            // Parse successful response
+            const uploadData = await uploadResponse.json()
+            if (uploadData.success && uploadData.data && uploadData.data.length > 0) {
+              const result = uploadData.data[0] // Single file result
+              attachments.push({
+                uuid: result.uuid,
+                originalName: result.originalName,
+                s3Key: result.s3Key,
+                s3Url: result.s3Url,
+                size: result.size,
+                type: result.type,
+                uploadedAt: result.uploadedAt,
+              })
+              console.log(`File ${i + 1} uploaded successfully:`, result.uuid)
+            } else {
+              throw new Error(`Invalid response for file ${file.name}`)
+            }
+          } catch (error) {
+            console.error(`Failed to upload file ${i + 1} (${file.name}):`, error)
+            throw new Error(`Failed to upload ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`)
           }
-          attachments = uploadData.data.map((result: {
-            uuid: string;
-            originalName: string;
-            s3Key: string;
-            s3Url: string;
-            size: number;
-            type: string;
-            uploadedAt: string;
-          }) => ({
-            uuid: result.uuid,
-            originalName: result.originalName,
-            s3Key: result.s3Key,
-            s3Url: result.s3Url,
-            size: result.size,
-            type: result.type,
-            uploadedAt: result.uploadedAt
-          }))
-        } catch (error) {
-          console.error('Failed to upload files to S3:', error)
-          throw new Error(`File upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
         }
+        
+        console.log(`All ${attachments.length} files uploaded successfully`)
       }
 
       // Create the ticket record - database handles assignment and ticket ID automatically

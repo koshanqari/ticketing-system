@@ -55,10 +55,46 @@ export default function SubmissionForm() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     if (files.length > 0) {
+      // File validation
+      const maxFileSize = 50 * 1024 * 1024 // 50MB
+      const maxFiles = 5
+      const allowedTypes = [
+        'image/jpeg', 'image/png', 'image/gif',
+        'video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/flv', 'video/webm', 'video/mkv',
+        'application/pdf', 'text/plain',
+        'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      ]
+
+      // Check file count
+      if (formData.attachments.length + files.length > maxFiles) {
+        setSubmitError(`Maximum ${maxFiles} files allowed. You have ${formData.attachments.length} files and trying to add ${files.length} more.`)
+        return
+      }
+
+      // Check each file
+      for (const file of files) {
+        // Check file size
+        if (file.size > maxFileSize) {
+          setSubmitError(`File "${file.name}" is too large. Maximum size is ${(maxFileSize / 1024 / 1024).toFixed(0)}MB.`)
+          return
+        }
+
+        // Check file type
+        if (!allowedTypes.includes(file.type)) {
+          setSubmitError(`File "${file.name}" has an unsupported file type. Allowed types: Images, Videos, PDF, Word, Excel, Text files.`)
+          return
+        }
+      }
+
+      // All validations passed
       setFormData(prev => ({
         ...prev,
         attachments: [...prev.attachments, ...files]
       }))
+      
+      // Clear any previous errors
+      setSubmitError('')
     }
   }
 
@@ -365,12 +401,15 @@ export default function SubmissionForm() {
                       or drag and drop
                     </p>
                     <p className="text-xs text-gray-500 mt-1">
-                      Multiple images and videos up to 10MB each
+                      Images, videos, PDFs, Word, Excel files up to 50MB each (max 5 files)
                     </p>
                   </div>
                 </label>
                 {formData.attachments.length > 0 && (
                   <div className="mt-4 space-y-2">
+                    <div className="text-xs text-gray-500 mb-2">
+                      {formData.attachments.length}/5 files • Max 50MB per file
+                    </div>
                     {formData.attachments.map((file, index) => (
                       <div key={index} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
                         <div className="flex items-center text-sm text-blue-700">
@@ -381,7 +420,12 @@ export default function SubmissionForm() {
                           ) : (
                             <File className="w-4 h-4 mr-2" />
                           )}
-                          {file.name}
+                          <div>
+                            <div className="font-medium">{file.name}</div>
+                            <div className="text-xs text-blue-600">
+                              {(file.size / 1024 / 1024).toFixed(1)} MB • {file.type}
+                            </div>
+                          </div>
                         </div>
                         <button
                           type="button"
@@ -391,7 +435,7 @@ export default function SubmissionForm() {
                               attachments: prev.attachments.filter((_, i) => i !== index)
                             }))
                           }}
-                          className="text-red-500 hover:text-red-700 p-1"
+                          className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-colors"
                         >
                           <X className="w-4 h-4" />
                         </button>
