@@ -32,6 +32,7 @@ export class S3FileUploadService {
       'video/mp4',
       'video/avi',
       'video/mov',
+      'video/quicktime', // .MOV files often have this MIME type
       'video/wmv',
       'video/flv',
       'video/webm',

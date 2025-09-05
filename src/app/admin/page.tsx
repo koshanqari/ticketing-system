@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Search, BarChart3, CheckCircle, Clock, FileText, Save, X, ChevronDown, Calendar } from 'lucide-react'
+import { Search, BarChart3, CheckCircle, Clock, FileText, Save, X, ChevronDown, Calendar, Image, Video } from 'lucide-react'
 import { Ticket, Assignee, DropdownOption, IssueTypeL1, Status, S3Attachment } from '@/types'
 import { ticketService } from '@/lib/ticketService'
 import { dropdownService } from '@/lib/dropdownService'
@@ -81,6 +81,7 @@ export default function AdminPanel() {
     startDate: '',
     endDate: ''
   })
+  const [isClient, setIsClient] = useState(false)
   
   // Date dropdown state
   const [showDateDropdown, setShowDateDropdown] = useState(false)
@@ -92,6 +93,24 @@ export default function AdminPanel() {
   // Admin info state
   const [adminLoginId, setAdminLoginId] = useState<string>('')
   const [isLoadingAdminInfo, setIsLoadingAdminInfo] = useState(false)
+  
+  // Initialize client-side state to prevent hydration mismatch
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
+  // Helper functions for date calculations (only run on client)
+  const getToday = () => isClient ? new Date().toISOString().split('T')[0] : ''
+  const getYesterday = () => isClient ? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0] : ''
+  const getLast7Days = () => isClient ? new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : ''
+  const getLast30Days = () => isClient ? new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : ''
+  const getLastYear = () => isClient ? new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : ''
+  
+  // Helper function for date formatting (only run on client)
+  const formatDate = (dateString: string) => {
+    if (!isClient || !dateString) return dateString
+    return new Date(dateString).toLocaleDateString()
+  }
   
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -329,9 +348,6 @@ export default function AdminPanel() {
       if (updates.issue_type_l2 !== undefined) {
         await ticketService.updateTicketIssueTypeL2(ticketId, updates.issue_type_l2 || '')
       }
-      if (updates.description) {
-        await ticketService.updateTicketDescription(ticketId, updates.description)
-      }
       if (updates.panel) {
         await ticketService.updateTicketPanel(ticketId, updates.panel)
       }
@@ -430,10 +446,9 @@ export default function AdminPanel() {
                 <Calendar className="w-4 h-4 text-gray-500" />
                 <span className="text-sm">
                   {dateRange.startDate && dateRange.endDate 
-                    ? `${new Date(dateRange.startDate).toLocaleDateString()} - ${new Date(dateRange.endDate).toLocaleDateString()}`
+                    ? `${formatDate(dateRange.startDate)} - ${formatDate(dateRange.endDate)}`
                     : 'All Time'
                   }
-
                 </span>
                 <ChevronDown className="w-4 h-4 text-gray-400" />
               </button>
@@ -455,7 +470,7 @@ export default function AdminPanel() {
                       </button>
                       <button
                         onClick={() => {
-                          const today = new Date().toISOString().split('T')[0]
+                          const today = getToday()
                           setDateRange({ startDate: today, endDate: today })
                           setShowDateDropdown(false)
                         }}
@@ -465,7 +480,7 @@ export default function AdminPanel() {
                       </button>
                       <button
                         onClick={() => {
-                          const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+                          const yesterday = getYesterday()
                           setDateRange({ startDate: yesterday, endDate: yesterday })
                           setShowDateDropdown(false)
                         }}
@@ -475,8 +490,8 @@ export default function AdminPanel() {
                       </button>
                       <button
                         onClick={() => {
-                          const today = new Date().toISOString().split('T')[0]
-                          const last7Days = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+                          const today = getToday()
+                          const last7Days = getLast7Days()
                           setDateRange({ startDate: last7Days, endDate: today })
                           setShowDateDropdown(false)
                         }}
@@ -486,8 +501,8 @@ export default function AdminPanel() {
                       </button>
                       <button
                         onClick={() => {
-                          const today = new Date().toISOString().split('T')[0]
-                          const last30Days = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+                          const today = getToday()
+                          const last30Days = getLast30Days()
                           setDateRange({ startDate: last30Days, endDate: today })
                           setShowDateDropdown(false)
                         }}
@@ -497,8 +512,8 @@ export default function AdminPanel() {
                       </button>
                       <button
                         onClick={() => {
-                          const today = new Date().toISOString().split('T')[0]
-                          const lastYear = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+                          const today = getToday()
+                          const lastYear = getLastYear()
                           setDateRange({ startDate: lastYear, endDate: today })
                           setShowDateDropdown(false)
                         }}
@@ -1005,11 +1020,11 @@ export default function AdminPanel() {
                     <td className="px-4 py-4 text-center" style={{width: columnWidths.time}}>
                       <div className="flex flex-col items-center">
                         <div className="text-sm font-medium text-gray-900">
-                          {new Date(ticket.created_time).toLocaleDateString()}
+                          {formatDate(ticket.created_time)}
                         </div>
                         {ticket.resolved_time && (
                           <div className="text-sm text-gray-500">
-                            Resolved: {new Date(ticket.resolved_time).toLocaleDateString()}
+                            Resolved: {formatDate(ticket.resolved_time)}
                           </div>
                         )}
                       </div>
@@ -1164,11 +1179,11 @@ export default function AdminPanel() {
                     </h2>
                       <div className="flex items-center space-x-4 mt-1">
                     <p className="text-sm text-gray-500">
-                          Created: {new Date(selectedTicket.created_time).toLocaleDateString()}
+                          Created: {formatDate(selectedTicket.created_time)}
                         </p>
                         {selectedTicket.resolved_time && (
                           <p className="text-sm text-gray-500">
-                            Resolved: {new Date(selectedTicket.resolved_time).toLocaleDateString()}
+                            Resolved: {formatDate(selectedTicket.resolved_time)}
                           </p>
                         )}
                         <div className="flex items-center space-x-2">
@@ -1222,7 +1237,6 @@ export default function AdminPanel() {
                       priority: selectedTicket.priority,
                       assigned_to_id: selectedTicket.assigned_to_id,
                       issue_type_l2: selectedTicket.issue_type_l2,
-                      description: selectedTicket.description,
                       panel: selectedTicket.panel,
                       remarks: selectedTicket.remarks
                     })}
@@ -1414,16 +1428,12 @@ export default function AdminPanel() {
 
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-                    <textarea
-                      value={selectedTicket.description}
-                      onChange={(e) => setSelectedTicket(prev => prev ? { ...prev, description: e.target.value } : null)}
-                      rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 resize-none"
-                      placeholder="Describe the issue in detail..."
-                    />
+                    <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700 min-h-[80px] whitespace-pre-wrap">
+                      {selectedTicket.description || 'No description provided'}
                   </div>
                 </div>
               </div>
+                  </div>
 
               
 
@@ -1448,51 +1458,18 @@ export default function AdminPanel() {
                       <div key={index} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
                         <div className="w-full h-20 bg-gray-100 rounded flex items-center justify-center mb-2">
                            {typeof attachment === 'object' && attachment.type?.startsWith('image/') ? (
-                             <div className="w-full h-full relative">
-                               <img 
-                                 src={attachment.viewUrl || attachment.downloadUrl || attachment.s3Url} 
-                                 alt="Preview" 
-                                 className="w-full h-full object-cover rounded"
-                                 onLoad={() => {
-                                   console.log('Image loaded successfully:', attachment.originalName);
-                                 }}
-                                 onError={(e) => {
-                                   console.error('Image failed to load:', attachment.originalName, 'URL:', attachment.viewUrl || attachment.downloadUrl || attachment.s3Url);
-                                   // Hide image and show file icon on error
-                                   const img = e.currentTarget;
-                                   img.style.display = 'none';
-                                   const nextElement = img.nextElementSibling as HTMLElement;
-                                   if (nextElement) {
-                                     nextElement.style.display = 'flex';
-                                   }
-                                 }}
-                               />
-                               <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded" style={{ display: 'none' }}>
-                                 <FileText className="w-8 h-8 text-gray-400" />
-                               </div>
+                             <div className="w-full h-full flex items-center justify-center">
+                               <Image className="w-8 h-8 text-blue-500 mx-auto" />
                              </div>
                            ) : typeof attachment === 'object' && attachment.type?.startsWith('video/') ? (
-                             <video 
-                               src={attachment.downloadUrl || attachment.s3Url}
-                               className="w-full h-full object-cover rounded"
-                               controls
-                               muted
-                               onError={() => {
-                                 // Hide video and show file icon on error
-                                 const video = document.querySelector(`video[src="${attachment.downloadUrl || attachment.s3Url}"]`) as HTMLVideoElement;
-                                 if (video) {
-                                   video.style.display = 'none';
-                                   const nextElement = video.nextElementSibling as HTMLElement;
-                                   if (nextElement) {
-                                     nextElement.style.display = 'flex';
-                                   }
-                                 }
-                               }}
-                             />
-                           ) : null}
-                           <div className={`w-full h-full flex items-center justify-center ${typeof attachment === 'object' && (attachment.type?.startsWith('image/') || attachment.type?.startsWith('video/')) ? 'hidden' : 'flex'}`}>
-                          <FileText className="w-8 h-8 text-gray-400" />
-                        </div>
+                             <div className="w-full h-full flex items-center justify-center">
+                               <Video className="w-8 h-8 text-purple-500 mx-auto" />
+                             </div>
+                           ) : (
+                             <div className="w-full h-full flex items-center justify-center">
+                               <FileText className="w-8 h-8 text-gray-400 mx-auto" />
+                             </div>
+                           )}
                          </div>
                          <p className="text-xs text-gray-600 text-center truncate font-medium">
                            {typeof attachment === 'string' ? `File ${index + 1}` : attachment.originalName}
@@ -1506,22 +1483,38 @@ export default function AdminPanel() {
                            <button
                              onClick={(e) => {
                                e.preventDefault();
-                               const url = attachment.viewUrl || attachment.downloadUrl || attachment.s3Url;
-                               console.log('Opening file URL in new tab:', url);
+                               // For videos and images, use viewUrl to open in browser
+                               // For other files, use downloadUrl to download
+                               let url;
+                               if (typeof attachment === 'object' && (attachment.type?.startsWith('video/') || attachment.type?.startsWith('image/'))) {
+                                 url = attachment.viewUrl || attachment.downloadUrl || attachment.s3Url;
+                                 console.log('Opening media file in new tab:', {
+                                   type: attachment.type,
+                                   viewUrl: attachment.viewUrl,
+                                   downloadUrl: attachment.downloadUrl,
+                                   s3Url: attachment.s3Url,
+                                   selectedUrl: url
+                                 });
+                               } else {
+                                 url = attachment.downloadUrl || attachment.s3Url;
+                                 console.log('Downloading file:', url);
+                               }
                                window.open(url, '_blank');
                              }}
                              className="text-xs text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded flex-1 transition-colors"
                            >
-                             👁️ View
+                             {typeof attachment === 'object' && (attachment.type?.startsWith('video/') || attachment.type?.startsWith('image/')) ? '👁️ View' : '⬇️ Download'}
                            </button>
-                           <a
-                             href={attachment.downloadUrl || attachment.s3Url}
-                             download={typeof attachment === 'object' ? attachment.originalName : `file-${index + 1}`}
-                             className="text-xs text-green-600 hover:text-green-800 bg-green-50 hover:bg-green-100 px-2 py-1 rounded flex-1 text-center transition-colors"
-                           >
-                             ⬇️ Download
-                           </a>
-                         </div>
+                           {typeof attachment === 'object' && (attachment.type?.startsWith('video/') || attachment.type?.startsWith('image/')) && (
+                             <a
+                               href={attachment.downloadUrl || attachment.s3Url}
+                               download={attachment.originalName}
+                               className="text-xs text-green-600 hover:text-green-800 bg-green-50 hover:bg-green-100 px-2 py-1 rounded flex-1 text-center transition-colors"
+                             >
+                               ⬇️ Download
+                             </a>
+                           )}
+                      </div>
                        </div>
                       );
                     })}

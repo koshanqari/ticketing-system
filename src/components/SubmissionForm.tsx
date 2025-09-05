@@ -60,7 +60,7 @@ export default function SubmissionForm() {
       const maxFiles = 5
       const allowedTypes = [
         'image/jpeg', 'image/png', 'image/gif',
-        'video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/flv', 'video/webm', 'video/mkv',
+        'video/mp4', 'video/avi', 'video/mov', 'video/quicktime', 'video/wmv', 'video/flv', 'video/webm', 'video/mkv',
         'application/pdf', 'text/plain',
         'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
