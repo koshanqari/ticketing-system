@@ -47,7 +47,7 @@ export default function AdminLogin({ onLogin, onCancel, isOpen }: AdminLoginProp
       } else {
         setError('Invalid credentials. Please try again.')
       }
-    } catch (error) {
+    } catch {
       setError('An error occurred. Please try again.')
     } finally {
       setIsLoading(false)

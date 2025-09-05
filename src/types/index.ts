@@ -4,6 +4,18 @@ export type IssueTypeL1 = 'Tech' | 'Training' | 'General Query'
 export type Status = 'Open' | 'Ongoing' | 'Closed'
 export type Priority = 'Low' | 'Medium' | 'High'
 
+export interface S3Attachment {
+  uuid: string
+  originalName: string
+  s3Key: string
+  s3Url: string
+  size: number
+  type: string
+  uploadedAt: string
+  downloadUrl?: string
+  viewUrl?: string
+}
+
 export interface Ticket {
   id: string
   ticket_id: string // Auto-generated human-readable ID (A-ddmmyy-num format)
@@ -16,7 +28,7 @@ export interface Ticket {
   issue_type_l1: IssueTypeL1
   issue_type_l2?: string // Set by admin
   description: string
-  attachments: string[] // Array of file URLs stored in Supabase Storage
+  attachments: S3Attachment[] // Array of S3 attachment objects
   status: Status // Auto-determined by disposition
   disposition?: string // Set by admin - determines status
   priority: Priority

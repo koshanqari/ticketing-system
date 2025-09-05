@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { Search, BarChart3, CheckCircle, Clock, FileText, Save, X, ChevronDown, Calendar } from 'lucide-react'
-import { Ticket, Assignee, DropdownOption, IssueTypeL1, Status } from '@/types'
+import { Ticket, Assignee, DropdownOption, IssueTypeL1, Status, S3Attachment } from '@/types'
 import { ticketService } from '@/lib/ticketService'
 import { dropdownService } from '@/lib/dropdownService'
 import { dispositionWhatsappService } from '@/lib/dispositionWhatsappService'
@@ -59,6 +60,7 @@ export default function AdminPanel() {
   const [showModal, setShowModal] = useState(false)
   const [modalLoading, setModalLoading] = useState(false)
   const [modalSuccess, setModalSuccess] = useState(false)
+  const [attachmentsWithUrls, setAttachmentsWithUrls] = useState<S3Attachment[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [filters, setFilters] = useState({
     status: '',
@@ -641,13 +643,13 @@ export default function AdminPanel() {
                 <div className="w-16 h-16 bg-gray-500 rounded-2xl flex items-center justify-center">
                   <X className="w-8 h-8 text-white" />
                 </div>
-                <div className="text-right">
+                  <div className="text-right">
                   <p className="text-sm font-medium text-gray-700">Closed</p>
                   <p className="text-4xl font-bold text-gray-900">{analytics.closed}</p>
+                  </div>
                 </div>
               </div>
-            </div>
-
+              
             {/* 5. Total Tickets */}
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-4 border border-blue-200">
               <div className="flex items-center justify-between h-full">
@@ -683,7 +685,7 @@ export default function AdminPanel() {
               </div>
               <span className="text-sm text-gray-900 font-medium">
                 Showing {startIndex + 1}-{Math.min(endIndex, totalTickets)} of {totalTickets} tickets
-              </span>
+            </span>
             </div>
           </div>
           <div className="flex flex-col lg:flex-row gap-4">
@@ -884,11 +886,72 @@ export default function AdminPanel() {
                   <tr 
                     key={ticket.id} 
                     className="hover:bg-gray-50 cursor-pointer"
-                    onClick={() => {
+                    onClick={async () => {
                       setSelectedTicket(ticket)
                       setShowModal(true)
                       setModalLoading(false) // Reset loading state
                       setModalSuccess(false) // Reset success state
+                      
+                      // Get presigned URLs for attachments if they exist
+                      if (ticket.attachments && ticket.attachments.length > 0) {
+                        try {
+                          console.log('Getting presigned URLs for ticket attachments:', ticket.attachments);
+                          
+                          // Parse attachments if they are JSON strings
+                          const parsedAttachments = ticket.attachments.map(att => {
+                            if (typeof att === 'string') {
+                              try {
+                                return JSON.parse(att);
+                              } catch (e) {
+                                console.error('Failed to parse attachment:', e);
+                                return att;
+                              }
+                            }
+                            return att;
+                          });
+                          
+                          const response = await fetch('/api/get-download-urls', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ attachments: parsedAttachments }),
+                          });
+                          
+                          if (response.ok) {
+                            const data = await response.json();
+                            console.log('Received presigned URLs:', data.data);
+                            setAttachmentsWithUrls(data.data);
+                          } else {
+                            const errorData = await response.json();
+                            console.error('Failed to get download URLs:', errorData);
+                            // Fallback to original attachments with s3Url as downloadUrl
+                            setAttachmentsWithUrls(parsedAttachments.map(att => ({
+                              ...att,
+                              downloadUrl: att.s3Url || att
+                            })));
+                          }
+                        } catch (error) {
+                          console.error('Error getting download URLs:', error);
+                          // Fallback to original attachments with s3Url as downloadUrl
+                          const parsedAttachments = ticket.attachments.map(att => {
+                            if (typeof att === 'string') {
+                              try {
+                                return JSON.parse(att);
+                              } catch {
+                                return att;
+                              }
+                            }
+                            return att;
+                          });
+                          setAttachmentsWithUrls(parsedAttachments.map(att => ({
+                            ...att,
+                            downloadUrl: att.s3Url || att
+                          })));
+                        }
+                      } else {
+                        setAttachmentsWithUrls([]);
+                      }
                     }}
                   >
                     <td className="px-6 py-4 text-center" style={{width: columnWidths.status}}>
@@ -900,7 +963,7 @@ export default function AdminPanel() {
                           {ticket.status}
                         </span>
                         {ticket.disposition && (
-                          <div>
+                        <div>
                             <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
                               {ticket.disposition}
                             </span>
@@ -1094,13 +1157,13 @@ export default function AdminPanel() {
                   <div className="flex items-center space-x-4">
                     <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
                       <FileText className="w-6 h-6 text-blue-600" />
-                    </div>
-                    <div>
+                  </div>
+                  <div>
                       <h2 className="text-2xl font-bold text-gray-900">
                         {selectedTicket.ticket_id}
-                      </h2>
+                    </h2>
                       <div className="flex items-center space-x-4 mt-1">
-                        <p className="text-sm text-gray-500">
+                    <p className="text-sm text-gray-500">
                           Created: {new Date(selectedTicket.created_time).toLocaleDateString()}
                         </p>
                         {selectedTicket.resolved_time && (
@@ -1116,8 +1179,8 @@ export default function AdminPanel() {
                           )}>
                             {selectedTicket.status}
                           </span>
-                        </div>
-                      </div>
+                  </div>
+                </div>
                     </div>
                   </div>
                   
@@ -1180,17 +1243,17 @@ export default function AdminPanel() {
                   </button>
 
                   {/* Close Button */}
-                  <button
-                    onClick={() => {
-                      setShowModal(false)
-                      setSelectedTicket(null)
-                      setModalLoading(false)
-                      setModalSuccess(false)
-                    }}
+                <button
+                  onClick={() => {
+                    setShowModal(false)
+                    setSelectedTicket(null)
+                    setModalLoading(false)
+                    setModalSuccess(false)
+                  }}
                     className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors flex-shrink-0"
-                  >
+                >
                     <X className="w-5 h-5" />
-                  </button>
+                </button>
                 </div>
               </div>
             </div>
@@ -1365,21 +1428,68 @@ export default function AdminPanel() {
               
 
               {/* Section 3: Attachments */}
-              {selectedTicket.attachments && selectedTicket.attachments.length > 0 && (
+              {attachmentsWithUrls && attachmentsWithUrls.length > 0 && (
                 <div className="mb-8">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                     <div className="w-2 h-2 bg-orange-500 rounded-full mr-3"></div>
-                    Attachments ({selectedTicket.attachments.length})
+                    Attachments ({attachmentsWithUrls.length})
                   </h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {selectedTicket.attachments.map((attachment, index) => (
+                    {attachmentsWithUrls.map((attachment, index) => (
                       <div key={index} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
                         <div className="w-full h-20 bg-gray-100 rounded flex items-center justify-center mb-2">
+                           {typeof attachment === 'object' && attachment.type?.startsWith('image/') ? (
+                             <Image 
+                               src={attachment.downloadUrl || attachment.s3Url} 
+                               alt="Preview" 
+                               width={80}
+                               height={80}
+                               className="w-full h-full object-cover rounded"
+                               onError={() => {
+                                 // Hide image and show file icon on error
+                                 const img = document.querySelector(`img[src="${attachment.downloadUrl || attachment.s3Url}"]`) as HTMLImageElement;
+                                 if (img) {
+                                   img.style.display = 'none';
+                                   const nextElement = img.nextElementSibling as HTMLElement;
+                                   if (nextElement) {
+                                     nextElement.style.display = 'flex';
+                                   }
+                                 }
+                               }}
+                             />
+                           ) : null}
+                           <div className={`w-full h-full flex items-center justify-center ${typeof attachment === 'object' && attachment.type?.startsWith('image/') ? 'hidden' : 'flex'}`}>
                           <FileText className="w-8 h-8 text-gray-400" />
                         </div>
-                        <p className="text-xs text-gray-600 text-center truncate">
-                          File {index + 1}
-                        </p>
+                         </div>
+                         <p className="text-xs text-gray-600 text-center truncate font-medium">
+                           {typeof attachment === 'string' ? `File ${index + 1}` : attachment.originalName}
+                         </p>
+                         {typeof attachment === 'object' && (
+                           <p className="text-xs text-gray-500 text-center mt-1">
+                             {(attachment.size / 1024).toFixed(1)} KB
+                           </p>
+                         )}
+                         <div className="flex gap-1 mt-2">
+                           <button
+                             onClick={(e) => {
+                               e.preventDefault();
+                               const url = attachment.viewUrl || attachment.downloadUrl || attachment.s3Url;
+                               console.log('Opening file URL in new tab:', url);
+                               window.open(url, '_blank');
+                             }}
+                             className="text-xs text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded flex-1 transition-colors"
+                           >
+                             👁️ View
+                           </button>
+                           <a
+                             href={attachment.downloadUrl || attachment.s3Url}
+                             download={typeof attachment === 'object' ? attachment.originalName : `file-${index + 1}`}
+                             className="text-xs text-green-600 hover:text-green-800 bg-green-50 hover:bg-green-100 px-2 py-1 rounded flex-1 text-center transition-colors"
+                           >
+                             ⬇️ Download
+                           </a>
+                         </div>
                       </div>
                     ))}
                   </div>

@@ -1,26 +1,6 @@
-interface WhatsAppRecipient {
-  name: string
-  phone: string
-}
+// Removed unused interfaces
 
-interface WhatsAppTemplate {
-  templateName: string
-  bodyValues: {
-    Name: string
-    ticket_id: string
-    [key: string]: string // Allow additional dynamic values
-  }
-}
-
-interface WhatsAppMessage {
-  channelId: string
-  channelType: string
-  recipient: WhatsAppRecipient
-  whatsapp: {
-    type: string
-    template: WhatsAppTemplate
-  }
-}
+// Removed unused interface
 
 export class DispositionWhatsAppService {
   private apiKey = '67d1129cb7401ffd9e886569'

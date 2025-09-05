@@ -36,7 +36,7 @@ export class FileUploadService {
       const fileName = `${ticketId}/${timestamp}_${Math.random().toString(36).substring(2)}.${fileExtension}`
 
       // Upload to Supabase Storage
-      const { data, error } = await supabase!.storage
+      const { error } = await supabase!.storage
         .from(this.bucketName)
         .upload(fileName, file, {
           cacheControl: '3600',
@@ -60,7 +60,7 @@ export class FileUploadService {
 
   // Upload multiple files with progress tracking
   async uploadMultipleFiles(files: File[], ticketId: string, onProgress?: (progress: FileUploadProgress[]) => void): Promise<string[]> {
-    const uploadPromises = files.map(async (file, index) => {
+    const uploadPromises = files.map(async (file) => {
       const progress: FileUploadProgress = {
         file,
         progress: 0,

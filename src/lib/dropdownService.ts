@@ -129,7 +129,7 @@ export class DropdownService {
   }
 
   // Get L2 issue types for a specific L1 type
-  async getIssueTypeL2Options(l1Type: string): Promise<DropdownOption[]> {
+  async getIssueTypeL2Options(): Promise<DropdownOption[]> {
     try {
       if (!isSupabaseAvailable()) {
         throw new Error('Supabase is not configured')
