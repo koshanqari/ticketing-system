@@ -41,11 +41,25 @@ export class TicketService {
           })
 
           if (!uploadResponse.ok) {
-            const errorData = await uploadResponse.json()
-            throw new Error(errorData.message || 'Upload failed')
+            let errorMessage = 'Upload failed';
+            try {
+              const errorData = await uploadResponse.json()
+              errorMessage = errorData.message || errorData.details || 'Upload failed'
+            } catch {
+              // If response is not JSON, get text
+              const errorText = await uploadResponse.text()
+              errorMessage = `Upload failed: ${errorText}`
+            }
+            throw new Error(errorMessage)
           }
 
-          const uploadData = await uploadResponse.json()
+          let uploadData;
+          try {
+            uploadData = await uploadResponse.json()
+          } catch {
+            const responseText = await uploadResponse.text()
+            throw new Error(`Invalid response from upload API: ${responseText}`)
+          }
           attachments = uploadData.data.map((result: {
             uuid: string;
             originalName: string;
