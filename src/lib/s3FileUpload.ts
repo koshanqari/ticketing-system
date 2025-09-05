@@ -24,11 +24,18 @@ export interface FileUploadOptions {
 export class S3FileUploadService {
   private s3Service: AwsS3Service;
   private defaultOptions: FileUploadOptions = {
-    maxFileSize: 10 * 1024 * 1024, // 10MB
+    maxFileSize: 50 * 1024 * 1024, // 50MB (increased for videos)
     allowedTypes: [
       'image/jpeg',
       'image/png',
       'image/gif',
+      'video/mp4',
+      'video/avi',
+      'video/mov',
+      'video/wmv',
+      'video/flv',
+      'video/webm',
+      'video/mkv',
       'application/pdf',
       'text/plain',
       'application/msword',

@@ -11,6 +11,14 @@ export class AwsS3Service {
   constructor() {
     this.bucketName = process.env.AWS_S3_BUCKET || 'ampere-tickets-bucket';
     
+    // Debug logging for Vercel
+    console.log('AWS Configuration:', {
+      bucketName: this.bucketName,
+      region: process.env.AWS_REGION || 'ap-south-1',
+      hasAccessKey: !!process.env.AWS_ACCESS_KEY_ID,
+      hasSecretKey: !!process.env.AWS_SECRET_ACCESS_KEY,
+    });
+    
     this.s3Client = new S3Client({
       region: process.env.AWS_REGION || 'ap-south-1',
       credentials: {

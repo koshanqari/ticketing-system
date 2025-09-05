@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Image from 'next/image'
 import { Search, BarChart3, CheckCircle, Clock, FileText, Save, X, ChevronDown, Calendar } from 'lucide-react'
 import { Ticket, Assignee, DropdownOption, IssueTypeL1, Status, S3Attachment } from '@/types'
 import { ticketService } from '@/lib/ticketService'
@@ -921,6 +920,7 @@ export default function AdminPanel() {
                           if (response.ok) {
                             const data = await response.json();
                             console.log('Received presigned URLs:', data.data);
+                            console.log('First attachment details:', data.data[0]);
                             setAttachmentsWithUrls(data.data);
                           } else {
                             const errorData = await response.json();
@@ -1435,22 +1435,54 @@ export default function AdminPanel() {
                     Attachments ({attachmentsWithUrls.length})
                   </h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {attachmentsWithUrls.map((attachment, index) => (
+                    {attachmentsWithUrls.map((attachment, index) => {
+                      console.log(`Attachment ${index}:`, {
+                        type: attachment.type,
+                        isImage: attachment.type?.startsWith('image/'),
+                        isVideo: attachment.type?.startsWith('video/'),
+                        hasViewUrl: !!attachment.viewUrl,
+                        hasDownloadUrl: !!attachment.downloadUrl,
+                        originalName: attachment.originalName
+                      });
+                      return (
                       <div key={index} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
                         <div className="w-full h-20 bg-gray-100 rounded flex items-center justify-center mb-2">
                            {typeof attachment === 'object' && attachment.type?.startsWith('image/') ? (
-                             <Image 
-                               src={attachment.downloadUrl || attachment.s3Url} 
-                               alt="Preview" 
-                               width={80}
-                               height={80}
-                               className="w-full h-full object-cover rounded"
-                               onError={() => {
-                                 // Hide image and show file icon on error
-                                 const img = document.querySelector(`img[src="${attachment.downloadUrl || attachment.s3Url}"]`) as HTMLImageElement;
-                                 if (img) {
+                             <div className="w-full h-full relative">
+                               <img 
+                                 src={attachment.viewUrl || attachment.downloadUrl || attachment.s3Url} 
+                                 alt="Preview" 
+                                 className="w-full h-full object-cover rounded"
+                                 onLoad={() => {
+                                   console.log('Image loaded successfully:', attachment.originalName);
+                                 }}
+                                 onError={(e) => {
+                                   console.error('Image failed to load:', attachment.originalName, 'URL:', attachment.viewUrl || attachment.downloadUrl || attachment.s3Url);
+                                   // Hide image and show file icon on error
+                                   const img = e.currentTarget;
                                    img.style.display = 'none';
                                    const nextElement = img.nextElementSibling as HTMLElement;
+                                   if (nextElement) {
+                                     nextElement.style.display = 'flex';
+                                   }
+                                 }}
+                               />
+                               <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded" style={{ display: 'none' }}>
+                                 <FileText className="w-8 h-8 text-gray-400" />
+                               </div>
+                             </div>
+                           ) : typeof attachment === 'object' && attachment.type?.startsWith('video/') ? (
+                             <video 
+                               src={attachment.downloadUrl || attachment.s3Url}
+                               className="w-full h-full object-cover rounded"
+                               controls
+                               muted
+                               onError={() => {
+                                 // Hide video and show file icon on error
+                                 const video = document.querySelector(`video[src="${attachment.downloadUrl || attachment.s3Url}"]`) as HTMLVideoElement;
+                                 if (video) {
+                                   video.style.display = 'none';
+                                   const nextElement = video.nextElementSibling as HTMLElement;
                                    if (nextElement) {
                                      nextElement.style.display = 'flex';
                                    }
@@ -1458,7 +1490,7 @@ export default function AdminPanel() {
                                }}
                              />
                            ) : null}
-                           <div className={`w-full h-full flex items-center justify-center ${typeof attachment === 'object' && attachment.type?.startsWith('image/') ? 'hidden' : 'flex'}`}>
+                           <div className={`w-full h-full flex items-center justify-center ${typeof attachment === 'object' && (attachment.type?.startsWith('image/') || attachment.type?.startsWith('video/')) ? 'hidden' : 'flex'}`}>
                           <FileText className="w-8 h-8 text-gray-400" />
                         </div>
                          </div>
@@ -1490,8 +1522,9 @@ export default function AdminPanel() {
                              ⬇️ Download
                            </a>
                          </div>
-                      </div>
-                    ))}
+                       </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
