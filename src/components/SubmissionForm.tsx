@@ -3,12 +3,25 @@
 import { useState, useEffect } from 'react'
 import { Upload, Send, User, AlertTriangle, Image, X, Video, File } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { TicketFormData, Designation, Panel, DropdownOption } from '@/types'
+import { TicketFormData, Designation, Panel, DropdownOption, Assignee } from '@/types'
 import { fileUploadService } from '@/lib/fileUpload'
 import { ticketService } from '@/lib/ticketService'
 import { dropdownService } from '@/lib/dropdownService'
 
-export default function SubmissionForm() {
+interface SubmissionFormProps {
+  // Self-raise mode props
+  isSelfRaise?: boolean
+  assignees?: Assignee[]
+  selectedAssigneeId?: string
+  onClose?: () => void
+}
+
+export default function SubmissionForm({ 
+  isSelfRaise = false, 
+  assignees = [], 
+  selectedAssigneeId = '', 
+  onClose
+}: SubmissionFormProps = {}) {
   const [formData, setFormData] = useState<TicketFormData>({
     name: '',
     phone: '',
@@ -26,6 +39,9 @@ export default function SubmissionForm() {
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [submittedTicket, setSubmittedTicket] = useState<{ ticket_id?: string } | null>(null)
+  
+  // Self-raise mode state
+  const [assignedToId, setAssignedToId] = useState<string>(selectedAssigneeId || '')
 
   // Load dropdown options on component mount
   useEffect(() => {
@@ -40,6 +56,13 @@ export default function SubmissionForm() {
     
     loadDropdownOptions()
   }, [])
+
+  // Update assignedToId when selectedAssigneeId changes
+  useEffect(() => {
+    // If selectedAssigneeId is provided (specific assignee selected), use it
+    // If selectedAssigneeId is empty (All Assignees selected), set to empty for auto-assignment
+    setAssignedToId(selectedAssigneeId || '')
+  }, [selectedAssigneeId])
 
   const handleInputChange = (field: keyof TicketFormData, value: string | File) => {
     // Special handling for phone number to ensure only digits
@@ -119,12 +142,17 @@ export default function SubmissionForm() {
       return
     }
     
+    // Note: For self-raise mode, assignedToId can be empty (auto-assign) or specific assignee
+    // No validation needed as both cases are valid
+    
     setIsSubmitting(true)
     setSubmitError('')
 
     try {
       // Submit ticket to Supabase database
-      const submittedTicketData = await ticketService.submitTicket(formData)
+      const submittedTicketData = isSelfRaise 
+        ? await ticketService.submitTicketWithAssignment(formData, assignedToId)
+        : await ticketService.submitTicket(formData)
       
       // Store the submitted ticket data to show ticket ID
       setSubmittedTicket(submittedTicketData)
@@ -141,6 +169,11 @@ export default function SubmissionForm() {
         attachments: []
       })
       
+      // Reset assignee selection for self-raise mode
+      if (isSelfRaise) {
+        setAssignedToId(selectedAssigneeId || '')
+      }
+      
       // Success message stays until user chooses to submit another ticket
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : 'Failed to submit ticket. Please try again.')
@@ -156,7 +189,9 @@ export default function SubmissionForm() {
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <div className="w-8 h-8 bg-green-500 rounded-full"></div>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Ticket Submitted!</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            {isSelfRaise ? 'Ticket Self-Raised Successfully!' : 'Ticket Submitted!'}
+          </h2>
           
           {/* Ticket ID Display */}
           {submittedTicket?.ticket_id ? (
@@ -181,10 +216,14 @@ export default function SubmissionForm() {
 
           
                       <p className="text-gray-600 mb-6">
-              Your issue has been successfully submitted. We&apos;ll get back to you soon.
+              {isSelfRaise 
+                ? 'The ticket has been successfully created and assigned.'
+                : 'Your issue has been successfully submitted. We\'ll get back to you soon.'
+              }
               {submittedTicket?.ticket_id && (
                 <span className="block mt-2 text-sm">
-                  You can reference this ticket using ID: <strong>{submittedTicket.ticket_id}</strong>
+                  {isSelfRaise ? 'Ticket ID: ' : 'You can reference this ticket using ID: '}
+                  <strong>{submittedTicket.ticket_id}</strong>
                 </span>
               )}
             </p>
@@ -197,7 +236,7 @@ export default function SubmissionForm() {
             }}
             className="w-full bg-blue-600 text-white py-3 px-6 rounded-xl font-medium hover:bg-blue-700 transition-colors"
           >
-            Submit Another Ticket
+            {isSelfRaise ? 'Self-Raise Another Ticket' : 'Submit Another Ticket'}
           </button>
             
             {/* Copy Ticket ID Button */}
@@ -214,6 +253,16 @@ export default function SubmissionForm() {
                 📋 Copy Ticket ID
               </button>
             )}
+            
+            {/* Close Button for Self-Raise Mode */}
+            {isSelfRaise && onClose && (
+              <button
+                onClick={onClose}
+                className="w-full bg-gray-100 text-gray-700 py-2 px-6 rounded-xl font-medium hover:bg-gray-200 transition-colors text-sm"
+              >
+                Close
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -226,16 +275,54 @@ export default function SubmissionForm() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
-            Submit Your Issue
+            {isSelfRaise ? 'Self-Raise Ticket' : 'Submit Your Issue'}
           </h1>
           <p className="text-lg text-gray-600">
-            We&apos;re here to help! Please fill out the form below to report your issue.
+            {isSelfRaise 
+              ? 'Create a ticket on behalf of a user and assign it to a team member.'
+              : 'We\'re here to help! Please fill out the form below to report your issue.'
+            }
           </p>
         </div>
 
         {/* Form */}
         <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Assignment Section - Only for Self-Raise Mode */}
+            {isSelfRaise && (
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                  <User className="w-5 h-5 mr-2 text-green-600" />
+                  Assignment
+                </h2>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Assign To
+                  </label>
+                  <select
+                    value={assignedToId}
+                    onChange={(e) => setAssignedToId(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white text-gray-900"
+                  >
+                    <option value="" className="text-gray-500">
+                      Auto assign (Round Robin)
+                    </option>
+                    {assignees.map((assignee) => (
+                      <option key={assignee.id} value={assignee.id}>
+                        {assignee.name} - {assignee.department}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {selectedAssigneeId 
+                      ? 'Pre-selected based on admin panel filter' 
+                      : 'Auto-assignment will use round-robin if no specific assignee is selected'
+                    }
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Personal Information Section */}
             <div>
               <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
@@ -466,7 +553,7 @@ export default function SubmissionForm() {
                 ) : (
                   <div className="flex items-center justify-center">
                     <Send className="w-5 h-5 mr-2" />
-                    Submit Ticket
+                    {isSelfRaise ? 'Self-Raise Ticket' : 'Submit Ticket'}
                   </div>
                 )}
               </button>

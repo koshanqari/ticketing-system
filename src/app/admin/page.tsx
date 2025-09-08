@@ -8,6 +8,7 @@ import { dropdownService } from '@/lib/dropdownService'
 import { dispositionWhatsappService } from '@/lib/dispositionWhatsappService'
 import { cn } from '@/lib/utils'
 import AdminProtected from '@/components/AdminProtected'
+import SubmissionForm from '@/components/SubmissionForm'
 
 
 export default function AdminPanel() {
@@ -93,6 +94,9 @@ export default function AdminPanel() {
   // Admin info state
   const [adminLoginId, setAdminLoginId] = useState<string>('')
   const [isLoadingAdminInfo, setIsLoadingAdminInfo] = useState(false)
+  
+  // Self-raise modal state
+  const [showSelfRaiseModal, setShowSelfRaiseModal] = useState(false)
   
   // Initialize client-side state to prevent hydration mismatch
   useEffect(() => {
@@ -558,6 +562,18 @@ export default function AdminPanel() {
                 </div>
               )}
             </div>
+            
+            {/* Self-Raise Ticket Button */}
+            <button
+              onClick={() => {
+                // Open self-raise modal or navigate to self-raise form
+                setShowSelfRaiseModal(true)
+              }}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center"
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Self-Raise Ticket
+            </button>
             
             {/* Analytics Button */}
             <a 
@@ -1546,6 +1562,46 @@ export default function AdminPanel() {
 
 
 
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Self-Raise Ticket Modal */}
+      {showSelfRaiseModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-xl">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-900">Self-Raise Ticket</h2>
+                <button
+                  onClick={() => setShowSelfRaiseModal(false)}
+                  className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              <SubmissionForm 
+                isSelfRaise={true}
+                assignees={assignees}
+                selectedAssigneeId={filters.assigned_to}
+                onClose={() => {
+                  setShowSelfRaiseModal(false)
+                  // Refresh tickets after closing modal
+                  const refreshTickets = async () => {
+                    try {
+                      const updatedTickets = await ticketService.getAllTickets()
+                      setTickets(updatedTickets)
+                    } catch (error) {
+                      console.error('Failed to refresh tickets:', error)
+                    }
+                  }
+                  refreshTickets()
+                }}
+              />
             </div>
           </div>
         </div>

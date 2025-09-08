@@ -68,6 +68,7 @@ Section 2: **Issue Details**
 - Real-time data updates from Supabase database
 
 ### Navbar ✅ IMPLEMENTED
+- **Self-Raise Ticket Button**: Green button to create tickets on behalf of users with custom assignment
 - **Analytics Panel Button**: Direct access to `/analytics` route
 - **Assignees Dropdown**: Dynamic population from `assignees` table, shows "Name - Department"
 - **Date Range Selector**: Smart dropdown with quick actions and custom range
@@ -194,6 +195,50 @@ Section 2: **Issue Details**
 - **To Modify**: Simply change the pixel values in the `columnWidths` object
 - **Auto-wrapping**: Content automatically wraps to next line when exceeding column width
 - **Centered Layout**: All columns have centered content for better visual alignment
+
+### Self-Raise Ticket Feature ✅ IMPLEMENTED & FULLY FUNCTIONAL
+- **Modal Interface**: Opens in a modal overlay when "Self-Raise Ticket" button is clicked
+- **Reuses SubmissionForm**: Uses the existing submission form component with self-raise mode enabled
+- **Assignment Logic**: Smart assignment based on admin panel filter selection
+- **Custom Assignment**: Admins can override assignment and select any team member
+- **Auto-Assignment**: Supports round-robin assignment when no specific assignee is selected
+
+#### Assignment Logic ✅ IMPLEMENTED
+| Admin Panel Filter | Self-Raise Form Default | Behavior |
+|-------------------|------------------------|----------|
+| **"All Assignees"** | **"Auto assign (Round Robin)"** | Uses round-robin assignment like regular submission |
+| **Specific Assignee** | **Pre-selected assignee** | Pre-selects that specific assignee |
+| **Manual Override** | **Any assignee** | Admin can change assignment before submitting |
+
+#### Form Features ✅ IMPLEMENTED
+- **User Information**: Name, phone, email, designation (same as regular submission)
+- **Issue Details**: Panel, issue type, description (same as regular submission)
+- **Assignment Section**: Assignee dropdown with auto-selection logic
+- **File Attachments**: Multiple file upload with drag & drop support
+- **WhatsApp Integration**: Automatic notifications sent when tickets are created
+- **Success Feedback**: Shows ticket ID and confirmation after creation
+
+#### Technical Implementation ✅ IMPLEMENTED
+- **Component Reuse**: Uses existing `SubmissionForm` with `isSelfRaise={true}` prop
+- **Database Integration**: Uses `submitTicketWithAssignment()` method for custom assignment
+- **Assignment Logic**: 
+  - If `assignedToId` provided → Uses custom assignment
+  - If `assignedToId` empty → Uses round-robin assignment
+- **Database Trigger**: Updated to respect existing assignments and only auto-assign when NULL
+- **Real-time Updates**: Admin panel refreshes to show new ticket after creation
+
+#### Database Changes ✅ IMPLEMENTED
+- **Updated Trigger**: `auto_generate_ticket_id_and_assign()` now respects existing assignments
+- **Assignment Logic**: Only auto-assigns when `assigned_to_id` is NULL
+- **Custom Assignment**: Preserves provided `assigned_to_id` values
+- **Round Robin**: Falls back to round-robin when no assignment provided
+
+#### User Experience ✅ IMPLEMENTED
+- **Seamless Integration**: Appears as modal overlay without page navigation
+- **Smart Defaults**: Pre-selects assignee based on admin panel filter
+- **Flexible Assignment**: Allows both auto-assignment and custom assignment
+- **Consistent UI**: Same styling and behavior as regular submission form
+- **Success Flow**: Clear confirmation with ticket ID display and copy functionality
 
 
 ## 3. Analytics Panel
@@ -510,6 +555,9 @@ Notes:
 - **Referential Integrity**: Foreign key relationships maintained
 - **Round Robin Assignment**: `auto_assign_support_ticket()` function for Support department
 - **Parent-Child Logic**: Automatic L1 setting from L2, Status setting from Disposition
+- **Smart Assignment**: `auto_generate_ticket_id_and_assign()` trigger respects existing assignments
+  - **Custom Assignment**: Preserves `assigned_to_id` when provided by self-raise feature
+  - **Auto Assignment**: Uses round-robin when `assigned_to_id` is NULL
 
 ### 📊 Database Schema Updates
 - **New Column**: `disposition` added to tickets table
@@ -556,6 +604,19 @@ Notes:
 - **Search & Filtering**: Advanced search and filter capabilities ✅
 - **Assignee Management**: Dropdown selection from active team members ✅
 - **Real-time Updates**: Changes reflect immediately in the UI ✅
+- **Self-Raise Tickets**: Admins can create tickets on behalf of users with custom assignment ✅
+
+### ✅ Self-Raise Ticket Feature - COMPLETED
+- **Modal Interface**: Self-raise button opens modal with submission form ✅
+- **Component Reuse**: Uses existing SubmissionForm with self-raise mode enabled ✅
+- **Smart Assignment**: Auto-selects assignee based on admin panel filter ✅
+- **Custom Assignment**: Admins can override and select any team member ✅
+- **Auto-Assignment**: Supports round-robin when no specific assignee selected ✅
+- **Database Integration**: Custom assignment logic implemented in ticket service ✅
+- **Database Trigger**: Updated to respect existing assignments ✅
+- **WhatsApp Integration**: Notifications sent for self-raised tickets ✅
+- **Success Flow**: Ticket ID display and confirmation after creation ✅
+- **Real-time Updates**: Admin panel refreshes to show new ticket ✅
 
 ### 📋 Phase 3: Analytics Panel - PLANNED
 - Performance metrics and reporting dashboard
@@ -569,5 +630,7 @@ Notes:
 - WhatsApp notification system operational via Gallabox API ✅
 - Database schema implemented and tested ✅
 - Ticket ID system operational ✅
+- Self-raise ticket functionality with smart assignment logic ✅
+- Database triggers updated to support custom assignment ✅
 
 ---
