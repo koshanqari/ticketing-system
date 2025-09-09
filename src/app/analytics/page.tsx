@@ -6,8 +6,10 @@ import { Ticket, TicketAnalytics } from '@/types'
 import { ticketService } from '@/lib/ticketService'
 import { cn } from '@/lib/utils'
 import AdminProtected from '@/components/AdminProtected'
+import { useAdmin } from '@/contexts/AdminContext'
 
 export default function AnalyticsPanel() {
+  const { clearAdmin } = useAdmin()
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [loading, setLoading] = useState(true)
   const [timeFilter, setTimeFilter] = useState('7d')
@@ -136,8 +138,8 @@ export default function AnalyticsPanel() {
             {/* Logout Button */}
             <button
               onClick={() => {
-                localStorage.removeItem('adminId')
-                window.location.reload()
+                clearAdmin()
+                window.location.href = '/'
               }}
               className="px-3 py-2 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors font-medium"
             >

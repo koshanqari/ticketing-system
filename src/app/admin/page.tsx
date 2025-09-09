@@ -13,7 +13,7 @@ import { useAdmin } from '@/contexts/AdminContext'
 
 
 export default function AdminPanel() {
-  const { admin } = useAdmin()
+  const { admin, clearAdmin } = useAdmin()
   
   // Status color mapping function
   const getStatusColor = (status: string) => {
@@ -333,47 +333,83 @@ export default function AdminPanel() {
   const handleTicketUpdate = async (ticketId: string, updates: Partial<Ticket>) => {
     setModalLoading(true)
     try {
+      console.log('Starting ticket update:', { ticketId, updates })
+      
       // Store the original ticket data for WhatsApp
       const originalTicket = tickets.find(t => t.id === ticketId)
       
       if (updates.disposition) {
+        // Only send WhatsApp notification if disposition actually changed
+        const dispositionChanged = originalTicket && originalTicket.disposition !== updates.disposition
+        console.log('Updating disposition:', { 
+          oldDisposition: originalTicket?.disposition, 
+          newDisposition: updates.disposition, 
+          dispositionChanged 
+        })
+        
         await ticketService.updateTicketDisposition(ticketId, updates.disposition)
         
-        // Send WhatsApp notification if disposition triggers it
-        if (originalTicket && ['New', 'In Progress', 'No Response 1', 'Resolved', 'No Response 2'].includes(updates.disposition)) {
+        // Send WhatsApp notification only if disposition changed and triggers it
+        const whatsappTriggerDispositions = ['New', 'In Progress', 'No Response 1', 'Resolved', 'No Response 2']
+        const shouldSendWhatsApp = dispositionChanged && whatsappTriggerDispositions.includes(updates.disposition)
+        
+        console.log('WhatsApp decision:', {
+          dispositionChanged,
+          newDisposition: updates.disposition,
+          isWhatsAppTrigger: whatsappTriggerDispositions.includes(updates.disposition),
+          shouldSendWhatsApp,
+          originalTicket: originalTicket ? {
+            name: originalTicket.name,
+            phone: originalTicket.phone,
+            ticket_id: originalTicket.ticket_id
+          } : null
+        })
+        
+        if (shouldSendWhatsApp) {
           try {
+            console.log('Sending WhatsApp notification...')
             await dispositionWhatsappService.sendDispositionNotification(
               updates.disposition,
               originalTicket.name,
               originalTicket.phone,
               originalTicket.ticket_id
             )
-            console.log(`WhatsApp notification sent for disposition: ${updates.disposition}`)
+            console.log(`✅ WhatsApp notification sent for disposition change: ${originalTicket.disposition} → ${updates.disposition}`)
           } catch (whatsappError) {
-            console.error('Failed to send WhatsApp notification:', whatsappError)
+            console.error('❌ Failed to send WhatsApp notification:', whatsappError)
             // Don't fail the entire update if WhatsApp fails
           }
+        } else if (dispositionChanged) {
+          console.log(`⚠️ Disposition changed from ${originalTicket?.disposition} to ${updates.disposition}, but no WhatsApp notification needed`)
+        } else {
+          console.log(`ℹ️ Disposition unchanged (${updates.disposition}), no WhatsApp notification sent`)
         }
       }
       if (updates.priority !== undefined) {
+        console.log('Updating priority:', updates.priority)
         await ticketService.updateTicketPriority(ticketId, updates.priority)
       }
       if (updates.assigned_to_id) {
+        console.log('Updating assignment:', updates.assigned_to_id)
         await ticketService.assignTicket(ticketId, updates.assigned_to_id)
       }
 
       if (updates.issue_type_l2 !== undefined) {
+        console.log('Updating issue type L2:', updates.issue_type_l2)
         await ticketService.updateTicketIssueTypeL2(ticketId, updates.issue_type_l2 || '')
       }
       if (updates.panel) {
+        console.log('Updating panel:', updates.panel)
         await ticketService.updateTicketPanel(ticketId, updates.panel)
       }
 
       if (updates.remarks) {
+        console.log('Updating remarks:', updates.remarks)
         await ticketService.updateTicketRemarks(ticketId, updates.remarks)
       }
 
       // Refresh tickets
+      console.log('Refreshing tickets...')
       const updatedTickets = await ticketService.getAllTickets()
       setTickets(updatedTickets)
       
@@ -384,8 +420,14 @@ export default function AdminPanel() {
         setModalSuccess(false)
         // Don't auto-close modal - let user close it manually
       }, 1500)
+      console.log('Ticket update completed successfully')
     } catch (error) {
       console.error('Failed to update ticket:', error)
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        error
+      })
       setModalLoading(false)
     }
   }
@@ -428,8 +470,8 @@ export default function AdminPanel() {
             {/* Logout Button */}
             <button
               onClick={() => {
-                localStorage.removeItem('adminId')
-                window.location.reload()
+                clearAdmin()
+                window.location.href = '/'
               }}
               className="px-3 py-2 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors font-medium"
             >
