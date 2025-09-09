@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Eye, EyeOff, Lock, User, AlertTriangle } from 'lucide-react'
+import { useAdmin } from '@/contexts/AdminContext'
 
 interface AdminLoginProps {
   onLogin: (adminId: string) => void
@@ -10,6 +11,7 @@ interface AdminLoginProps {
 }
 
 export default function AdminLogin({ onLogin, onCancel, isOpen }: AdminLoginProps) {
+  const { setAdmin } = useAdmin()
   const [loginId, setLoginId] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -43,6 +45,14 @@ export default function AdminLogin({ onLogin, onCancel, isOpen }: AdminLoginProp
 
       if (response.ok) {
         const data = await response.json()
+        
+        // Store admin and assignee info in context
+        setAdmin({
+          id: data.adminId,
+          assigneeId: data.assigneeId,
+          assignee: data.assignee
+        })
+        
         onLogin(data.adminId)
       } else {
         setError('Invalid credentials. Please try again.')

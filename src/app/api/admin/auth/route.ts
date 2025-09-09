@@ -20,10 +20,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if the admin exists in the admin table
+    // Check if the admin exists in the admin table and get assignee info
     const { data: admin, error } = await supabase!
       .from('admins')
-      .select('id, login_id, password_hash, is_active')
+      .select(`
+        id, 
+        login_id, 
+        password_hash, 
+        is_active,
+        assignee_id,
+        assignees (
+          id,
+          name,
+          department,
+          is_active
+        )
+      `)
       .eq('login_id', loginId)
       .single()
 
@@ -53,10 +65,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Return success with admin ID
+    // Return success with admin ID and assignee info
     return NextResponse.json({
       success: true,
       adminId: admin.id,
+      assigneeId: admin.assignee_id,
+      assignee: admin.assignees,
       message: 'Login successful'
     })
 

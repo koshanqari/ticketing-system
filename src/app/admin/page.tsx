@@ -9,9 +9,12 @@ import { dispositionWhatsappService } from '@/lib/dispositionWhatsappService'
 import { cn } from '@/lib/utils'
 import AdminProtected from '@/components/AdminProtected'
 import SubmissionForm from '@/components/SubmissionForm'
+import { useAdmin } from '@/contexts/AdminContext'
 
 
 export default function AdminPanel() {
+  const { admin } = useAdmin()
+  
   // Status color mapping function
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -70,7 +73,7 @@ export default function AdminPanel() {
     issue_type_l1: '',
     issue_type_l2: '',
     disposition: '',
-    assigned_to: ''
+    assigned_to: admin?.assigneeId || ''
   })
   
   // Sorting state
@@ -102,6 +105,16 @@ export default function AdminPanel() {
   useEffect(() => {
     setIsClient(true)
   }, [])
+
+  // Update filters when admin context changes (auto-select admin's assignee)
+  useEffect(() => {
+    if (admin?.assigneeId) {
+      setFilters(prev => ({
+        ...prev,
+        assigned_to: admin.assigneeId || ''
+      }))
+    }
+  }, [admin?.assigneeId])
 
   // Helper functions for date calculations (only run on client)
   const getToday = () => isClient ? new Date().toISOString().split('T')[0] : ''

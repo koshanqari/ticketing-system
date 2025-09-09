@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react'
 import { isAdminProtectionEnabled } from '@/config/admin'
 import AdminLogin from './AdminLogin'
+import { useAdmin } from '@/contexts/AdminContext'
 
 interface AdminProtectedProps {
   children: React.ReactNode
 }
 
 export default function AdminProtected({ children }: AdminProtectedProps) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const { isLoggedIn } = useAdmin()
   const [showLogin, setShowLogin] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -17,30 +18,23 @@ export default function AdminProtected({ children }: AdminProtectedProps) {
     // Check if admin protection is enabled
     if (!isAdminProtectionEnabled()) {
       // No protection needed, show content immediately
-      setIsAuthenticated(true)
       setIsLoading(false)
       return
     }
 
-    // Check if user is already authenticated (from localStorage)
-    const adminId = localStorage.getItem('adminId')
-    if (adminId) {
-      setIsAuthenticated(true)
+    // Check if user is already authenticated (from context)
+    if (isLoggedIn) {
       setShowLogin(false)
     } else {
       setShowLogin(true)
     }
     setIsLoading(false)
-  }, [])
+  }, [isLoggedIn])
 
-  const handleLogin = (adminId: string) => {
-    // Store admin ID in localStorage for session persistence
-    localStorage.setItem('adminId', adminId)
-    setIsAuthenticated(true)
+  const handleLogin = () => {
+    // Admin info is already stored in context by AdminLogin component
     setShowLogin(false)
   }
-
-
 
   const handleCancel = () => {
     // Redirect to home page if login is cancelled
@@ -65,7 +59,7 @@ export default function AdminProtected({ children }: AdminProtectedProps) {
   }
 
   // If not authenticated, show login
-  if (!isAuthenticated) {
+  if (!isLoggedIn) {
     return (
       <AdminLogin
         onLogin={handleLogin}

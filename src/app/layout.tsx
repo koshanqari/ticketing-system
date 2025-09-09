@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { AdminProvider } from '@/contexts/AdminContext'
 
 export const metadata: Metadata = {
   title: 'Ticketing System',
@@ -14,12 +15,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <div className="min-h-screen bg-gray-50">
-          {/* Main Content */}
-          <main>
-            {children}
-          </main>
-        </div>
+        <AdminProvider>
+          <div className="min-h-screen bg-gray-50">
+            {/* Main Content */}
+            <main>
+              {children}
+            </main>
+          </div>
+        </AdminProvider>
       </body>
     </html>
   )
