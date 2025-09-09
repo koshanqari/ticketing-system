@@ -49,6 +49,7 @@ export default function AdminLogin({ onLogin, onCancel, isOpen }: AdminLoginProp
         // Store admin and assignee info in context
         setAdmin({
           id: data.adminId,
+          loginId: loginId, // Store the login ID that was used to log in
           assigneeId: data.assigneeId,
           assignee: data.assignee
         })

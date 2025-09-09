@@ -11,6 +11,7 @@ interface Assignee {
 
 interface Admin {
   id: string
+  loginId: string
   assigneeId: string | null
   assignee: Assignee | null
 }

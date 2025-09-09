@@ -94,9 +94,7 @@ export default function AdminPanel() {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(20)
   
-  // Admin info state
-  const [adminLoginId, setAdminLoginId] = useState<string>('')
-  const [isLoadingAdminInfo, setIsLoadingAdminInfo] = useState(false)
+  // Admin info state - now using AdminContext
   
   // Self-raise modal state
   const [showSelfRaiseModal, setShowSelfRaiseModal] = useState(false)
@@ -142,46 +140,7 @@ export default function AdminPanel() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showDateDropdown])
 
-  // Load admin info on component mount
-  useEffect(() => {
-    const adminId = localStorage.getItem('adminId')
-    
-    if (adminId) {
-      setIsLoadingAdminInfo(true)
-      
-      // Fetch admin details to get the actual login_id
-      const fetchAdminDetails = async () => {
-        try {
-          const response = await fetch('/api/admin/details', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ adminId }),
-          })
-          
-          if (response.ok) {
-            const data = await response.json()
-            setAdminLoginId(data.loginId)
-          } else {
-            console.error('Failed to fetch admin details:', response.status)
-            // Fallback to showing the UUID
-            setAdminLoginId(adminId)
-          }
-        } catch (error) {
-          console.error('Error fetching admin details:', error)
-          // Fallback to showing the UUID
-          setAdminLoginId(adminId)
-        } finally {
-          setIsLoadingAdminInfo(false)
-        }
-      }
-      
-      fetchAdminDetails()
-    } else {
-      setIsLoadingAdminInfo(false)
-    }
-  }, [])
+  // Admin info is now handled by AdminContext - no need for separate loading
 
   // Load data on component mount
   useEffect(() => {
@@ -451,13 +410,8 @@ export default function AdminPanel() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              {isLoadingAdminInfo ? (
-                <span className="flex items-center">
-                  <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-3"></div>
-                  Loading...
-                </span>
-              ) : adminLoginId ? (
-                `Welcome, ${adminLoginId}`
+              {admin?.loginId ? (
+                `Welcome, ${admin.loginId}`
               ) : (
                 'Welcome, Admin'
               )}
