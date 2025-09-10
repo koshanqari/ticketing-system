@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Upload, Send, User, AlertTriangle, Image, X, Video, File } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -32,12 +32,12 @@ export default function SubmissionForm({
   // - Self-raise mode: always 'admin'
   // - Query parameter source: use provided source (for 3rd party apps)
   // - Direct submission: null (no source)
-  const getQueryParam = (key: string): string => {
+  const getQueryParam = useCallback((key: string): string => {
     return searchParams?.get(key) || ''
-  }
+  }, [searchParams])
 
   // Determine source based on submission method
-  const getSource = (): string | undefined => {
+  const getSource = useCallback((): string | undefined => {
     if (isSelfRaise) {
       return 'admin' // Self-raise tickets always have source as 'admin'
     }
@@ -46,7 +46,7 @@ export default function SubmissionForm({
       return querySource // Use query parameter source for 3rd party apps
     }
     return undefined // Direct submissions remain null
-  }
+  }, [isSelfRaise, getQueryParam])
 
   const [formData, setFormData] = useState<TicketFormData>({
     name: getQueryParam('name'),
@@ -97,7 +97,7 @@ export default function SubmissionForm({
         source: getSource() // Use the proper source logic
       }))
     }
-  }, [searchParams, isSelfRaise])
+  }, [searchParams, isSelfRaise, getQueryParam, getSource])
 
   // Update assignedToId when selectedAssigneeId changes
   useEffect(() => {
