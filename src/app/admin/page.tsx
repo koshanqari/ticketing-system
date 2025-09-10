@@ -383,7 +383,33 @@ export default function AdminPanel() {
 
       if (updates.ext_remarks !== undefined) {
         console.log('Updating external remarks:', updates.ext_remarks)
+        
+        // Check if external remarks actually changed
+        const extRemarksChanged = originalTicket && originalTicket.ext_remarks !== updates.ext_remarks
+        console.log('External remarks change check:', {
+          oldExtRemarks: originalTicket?.ext_remarks,
+          newExtRemarks: updates.ext_remarks,
+          extRemarksChanged
+        })
+        
         await ticketService.updateTicketExtRemarks(ticketId, updates.ext_remarks)
+        
+        // Send WhatsApp notification only if external remarks actually changed and are not empty
+        if (extRemarksChanged && updates.ext_remarks && updates.ext_remarks.trim() !== '') {
+          try {
+            console.log('Sending External Remarks WhatsApp notification...')
+            await dispositionWhatsappService.sendExternalRemarksNotification(
+              originalTicket.name,
+              originalTicket.phone,
+              originalTicket.ticket_id,
+              originalTicket.description
+            )
+            console.log('✅ External Remarks WhatsApp notification sent successfully')
+          } catch (whatsappError) {
+            console.error('❌ Failed to send External Remarks WhatsApp notification:', whatsappError)
+            // Don't fail the entire update if WhatsApp fails
+          }
+        }
       }
 
       if (updates.resolution_estimate !== undefined) {
@@ -1611,7 +1637,7 @@ export default function AdminPanel() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">External Remarks</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">External Remarks 🟢</label>
                     <textarea
                       value={selectedTicket.ext_remarks || ''}
                       onChange={(e) => setSelectedTicket(prev => prev ? { ...prev, ext_remarks: e.target.value } : null)}

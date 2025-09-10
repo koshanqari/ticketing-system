@@ -192,6 +192,41 @@ export class DispositionWhatsAppService {
     }
   }
 
+  // Send WhatsApp notification for External Remarks
+  async sendExternalRemarksNotification(name: string, phone: string, ticketId: string, ticketDescription?: string): Promise<boolean> {
+    try {
+      console.log('Sending External Remarks WhatsApp notification...')
+      
+      const response = await fetch('/api/whatsapp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          disposition: 'External Remarks',
+          name,
+          phone,
+          ticketId,
+          ticketDescription
+        })
+      })
+
+      const result = await response.json()
+      console.log('External Remarks WhatsApp response:', result)
+
+      if (!response.ok) {
+        console.error('External Remarks WhatsApp error:', result)
+        return false
+      }
+
+      console.log('External Remarks WhatsApp notification sent successfully')
+      return true
+    } catch (error) {
+      console.error('Failed to send External Remarks WhatsApp notification:', error)
+      return false
+    }
+  }
+
   // Generic method to send WhatsApp based on disposition
   async sendDispositionNotification(
     disposition: string, 

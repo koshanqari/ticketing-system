@@ -604,6 +604,7 @@ Notes:
 - ✅ **Status Panel**: Users can check ticket status by phone number ✅
 - ✅ **Navigation Integration**: Easy switching between submit and status panels ✅
 - ✅ **Enhanced WhatsApp Notifications**: Ticket descriptions included in WhatsApp messages for all dispositions ✅
+- ✅ **External Remarks Notifications**: WhatsApp notifications sent when external remarks are added or updated ✅
 
 ### ✅ Phase 2: Admin Panel - COMPLETED
 - **Database Ready**: All data structures in place ✅

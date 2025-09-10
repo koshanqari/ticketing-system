@@ -75,6 +75,15 @@ export async function POST(request: NextRequest) {
               ticket_desc: truncatedDescription
             }
           }
+        case 'External Remarks':
+          return {
+            templateName: 'ticket_remarks',
+            bodyValues: {
+              Name: name,
+              ticket_id: ticketId,
+              ticket_desc: truncatedDescription
+            }
+          }
         default:
           // Fallback to new template for backward compatibility
           return {
