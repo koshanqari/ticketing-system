@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Upload, Send, User, AlertTriangle, Image, X, Video, File } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TicketFormData, Designation, Panel, DropdownOption, Assignee } from '@/types'
@@ -22,16 +23,42 @@ export default function SubmissionForm({
   selectedAssigneeId = '', 
   onClose
 }: SubmissionFormProps = {}) {
+  const searchParams = useSearchParams()
+  
+  // Parse query parameters for auto-filling form
+  // Supported parameters: name, phone, email, designation, panel, source
+  // Example URL: /?name=John%20Doe&phone=9876543210&email=john@example.com&designation=DSO&panel=Goal%20App&source=website
+  // Source logic:
+  // - Self-raise mode: always 'admin'
+  // - Query parameter source: use provided source (for 3rd party apps)
+  // - Direct submission: null (no source)
+  const getQueryParam = (key: string): string => {
+    return searchParams?.get(key) || ''
+  }
+
+  // Determine source based on submission method
+  const getSource = (): string | undefined => {
+    if (isSelfRaise) {
+      return 'admin' // Self-raise tickets always have source as 'admin'
+    }
+    const querySource = getQueryParam('source')
+    if (querySource) {
+      return querySource // Use query parameter source for 3rd party apps
+    }
+    return undefined // Direct submissions remain null
+  }
+
   const [formData, setFormData] = useState<TicketFormData>({
-    name: '',
-    phone: '',
-    email: '',
-    designation: '',
-    panel: '',
+    name: getQueryParam('name'),
+    phone: getQueryParam('phone'),
+    email: getQueryParam('email'),
+    designation: getQueryParam('designation') as Designation || '',
+    panel: getQueryParam('panel') as Panel || '',
     issue_type_l1: '',
     issue_type_l2: '',
     description: '',
-    attachments: []
+    attachments: [],
+    source: getSource()
   })
 
   const [dropdownOptions, setDropdownOptions] = useState<Record<string, DropdownOption[]>>({})
@@ -56,6 +83,21 @@ export default function SubmissionForm({
     
     loadDropdownOptions()
   }, [])
+
+  // Update form data when query parameters change
+  useEffect(() => {
+    if (searchParams) {
+      setFormData(prev => ({
+        ...prev,
+        name: getQueryParam('name') || prev.name,
+        phone: getQueryParam('phone') || prev.phone,
+        email: getQueryParam('email') || prev.email,
+        designation: (getQueryParam('designation') as Designation) || prev.designation,
+        panel: (getQueryParam('panel') as Panel) || prev.panel,
+        source: getSource() // Use the proper source logic
+      }))
+    }
+  }, [searchParams, isSelfRaise])
 
   // Update assignedToId when selectedAssigneeId changes
   useEffect(() => {
@@ -166,7 +208,8 @@ export default function SubmissionForm({
         issue_type_l1: '',
         issue_type_l2: '',
         description: '',
-        attachments: []
+        attachments: [],
+        source: getSource() // Use proper source logic
       })
       
       // Reset assignee selection for self-raise mode
@@ -463,6 +506,17 @@ export default function SubmissionForm({
                   />
               </div>
             </div>
+
+            {/* Hidden Source Field */}
+            {formData.source && (
+              <div className="hidden">
+                <input
+                  type="hidden"
+                  name="source"
+                  value={formData.source}
+                />
+              </div>
+            )}
 
             {/* Attachment Section */}
             <div>

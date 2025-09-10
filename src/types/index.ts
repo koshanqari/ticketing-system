@@ -35,6 +35,7 @@ export interface Ticket {
   assigned_to_id?: string // Foreign key to assignees table, Default: Auto-assigned
   remarks?: string // Admin notes and internal comments
   resolved_time?: string // When status is changed to resolved this time will be updated
+  source?: string // Optional - tracks where the submission came from
 }
 
 export interface Assignee {
@@ -75,6 +76,7 @@ export interface TicketFormData {
   issue_type_l2: string | ''
   description: string
   attachments: File[]
+  source?: string // Optional - hidden field to track submission source
 }
 
 export interface FileUploadProgress {
