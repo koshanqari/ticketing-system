@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, phone, ticketId, disposition } = await request.json()
+    const { name, phone, ticketId, disposition, ticketDescription } = await request.json()
 
     const apiKey = '67d1129cb7401ffd9e886569'
     const apiSecret = '9c22bae06c1149af81fd1f8f59ebab80'
@@ -19,56 +19,70 @@ export async function POST(request: NextRequest) {
 
     const formattedPhone = formatPhoneNumber(phone)
 
+    // Truncate ticket description to 50 characters
+    const truncateDescription = (description: string): string => {
+      if (!description || description.trim() === '') return 'No description provided'
+      return description.length > 50 ? description.substring(0, 50) + '...' : description
+    }
+
+    const truncatedDescription = truncateDescription(ticketDescription || '')
+
     // Get template name and body values based on disposition
     const getTemplateConfig = (disposition: string) => {
       switch (disposition) {
         case 'New':
           return {
-            templateName: 'ticket_generated_c1',
+            templateName: 'ticket_generated_c3',
             bodyValues: {
               Name: name,
-              ticket_id: ticketId
+              ticket_id: ticketId,
+              ticket_desc: truncatedDescription
             }
           }
         case 'In Progress':
           return {
-            templateName: 'ticket_inprof',
+            templateName: 'ticket_inprog',
             bodyValues: {
               Name: name,
-              ticket_id: ticketId
+              ticket_id: ticketId,
+              ticket_desc: truncatedDescription
             }
           }
         case 'No Response 1':
           return {
-            templateName: 'ticket_not_responding_1',
+            templateName: 'ticket_not_response_1',
             bodyValues: {
               Name: name,
-              ticket_id: ticketId
+              ticket_id: ticketId,
+              ticket_desc: truncatedDescription
             }
           }
         case 'Resolved':
           return {
-            templateName: 'ticket_resolved',
+            templateName: 'ticket_resolved_c1',
             bodyValues: {
               Name: name,
-              ticket_id: ticketId
+              ticket_id: ticketId,
+              ticket_desc: truncatedDescription
             }
           }
         case 'No Response 2':
           return {
-            templateName: 'ticket_not_responding_2',
+            templateName: 'ticket_not_response_2',
             bodyValues: {
               Name: name,
-              ticket_id: ticketId
+              ticket_id: ticketId,
+              ticket_desc: truncatedDescription
             }
           }
         default:
-          // Fallback to original template for backward compatibility
+          // Fallback to new template for backward compatibility
           return {
-            templateName: 'ticket_generated_c1',
+            templateName: 'ticket_generated_c3',
             bodyValues: {
               Name: name,
-              ticket_id: ticketId
+              ticket_id: ticketId,
+              ticket_desc: truncatedDescription
             }
           }
       }

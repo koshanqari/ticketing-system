@@ -34,8 +34,10 @@ export interface Ticket {
   priority: Priority
   assigned_to_id?: string // Foreign key to assignees table, Default: Auto-assigned
   remarks?: string // Admin notes and internal comments
+  ext_remarks?: string // External remarks visible to ticket submitter
   resolved_time?: string // When status is changed to resolved this time will be updated
   source?: string // Optional - tracks where the submission came from
+  resolution_estimate?: string // Optional - estimated resolution date set by assignee
 }
 
 export interface Assignee {

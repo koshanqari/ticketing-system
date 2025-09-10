@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Upload, Send, User, AlertTriangle, Image, X, Video, File } from 'lucide-react'
+import Link from 'next/link'
+import { Upload, Send, User, AlertTriangle, Image, X, Video, File, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TicketFormData, Designation, Panel, DropdownOption, Assignee } from '@/types'
 import { fileUploadService } from '@/lib/fileUpload'
@@ -315,8 +316,24 @@ export default function SubmissionForm({
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-2xl mx-auto">
+        {/* Navigation Bar */}
+        <div className="bg-white rounded-t-2xl shadow-sm border-b px-6 py-4 mb-0">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-900">Support App</h2>
+            {!isSelfRaise && (
+              <Link
+                href="/status"
+                className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                <Search className="w-4 h-4" />
+                <span>Check Status</span>
+              </Link>
+            )}
+          </div>
+        </div>
+
         {/* Header */}
-        <div className="text-center mb-8">
+        <div className="bg-white px-6 py-8 text-center">
           <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
             {isSelfRaise ? 'Self-Raise Ticket' : 'Submit Your Issue'}
           </h1>
@@ -329,7 +346,7 @@ export default function SubmissionForm({
         </div>
 
         {/* Form */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
+        <div className="bg-white rounded-b-2xl shadow-xl p-6 md:p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Assignment Section - Only for Self-Raise Mode */}
             {isSelfRaise && (

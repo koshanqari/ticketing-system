@@ -126,6 +126,19 @@ export default function AdminPanel() {
     if (!isClient || !dateString) return dateString
     return new Date(dateString).toLocaleDateString()
   }
+
+  // Helper function for date and time formatting (only run on client)
+  const formatDateTime = (dateString: string) => {
+    if (!isClient || !dateString) return dateString
+    return new Date(dateString).toLocaleString('en-IN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    })
+  }
   
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -331,7 +344,8 @@ export default function AdminPanel() {
               updates.disposition,
               originalTicket.name,
               originalTicket.phone,
-              originalTicket.ticket_id
+              originalTicket.ticket_id,
+              originalTicket.description
             )
             console.log(`✅ WhatsApp notification sent for disposition change: ${originalTicket.disposition} → ${updates.disposition}`)
           } catch (whatsappError) {
@@ -362,9 +376,19 @@ export default function AdminPanel() {
         await ticketService.updateTicketPanel(ticketId, updates.panel)
       }
 
-      if (updates.remarks) {
+      if (updates.remarks !== undefined) {
         console.log('Updating remarks:', updates.remarks)
         await ticketService.updateTicketRemarks(ticketId, updates.remarks)
+      }
+
+      if (updates.ext_remarks !== undefined) {
+        console.log('Updating external remarks:', updates.ext_remarks)
+        await ticketService.updateTicketExtRemarks(ticketId, updates.ext_remarks)
+      }
+
+      if (updates.resolution_estimate !== undefined) {
+        console.log('Updating resolution estimate:', updates.resolution_estimate)
+        await ticketService.updateTicketResolutionEstimate(ticketId, updates.resolution_estimate || null)
       }
 
       // Refresh tickets
@@ -1045,11 +1069,11 @@ export default function AdminPanel() {
                     <td className="px-4 py-4 text-center" style={{width: columnWidths.time}}>
                       <div className="flex flex-col items-center">
                         <div className="text-sm font-medium text-gray-900">
-                          {formatDate(ticket.created_time)}
+                          {formatDateTime(ticket.created_time)}
                         </div>
                         {ticket.resolved_time && (
                           <div className="text-sm text-gray-500">
-                            Resolved: {formatDate(ticket.resolved_time)}
+                            Resolved: {formatDateTime(ticket.resolved_time)}
                           </div>
                         )}
                       </div>
@@ -1204,11 +1228,11 @@ export default function AdminPanel() {
                     </h2>
                       <div className="flex items-center space-x-4 mt-1">
                     <p className="text-sm text-gray-500">
-                          Created: {formatDate(selectedTicket.created_time)}
+                          Created: {formatDateTime(selectedTicket.created_time)}
                         </p>
                         {selectedTicket.resolved_time && (
                           <p className="text-sm text-gray-500">
-                            Resolved: {formatDate(selectedTicket.resolved_time)}
+                            Resolved: {formatDateTime(selectedTicket.resolved_time)}
                           </p>
                         )}
                         <div className="flex items-center space-x-2">
@@ -1263,7 +1287,9 @@ export default function AdminPanel() {
                       assigned_to_id: selectedTicket.assigned_to_id,
                       issue_type_l2: selectedTicket.issue_type_l2,
                       panel: selectedTicket.panel,
-                      remarks: selectedTicket.remarks
+                      remarks: selectedTicket.remarks,
+                      ext_remarks: selectedTicket.ext_remarks,
+                      resolution_estimate: selectedTicket.resolution_estimate
                     })}
                     disabled={modalLoading}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1553,18 +1579,50 @@ export default function AdminPanel() {
                   <div className="w-2 h-2 bg-red-500 rounded-full mr-3"></div>
                   Admin Notes & Remarks
                 </h3>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Internal Remarks</label>
-                  <textarea
-                    value={selectedTicket.remarks || ''}
-                    onChange={(e) => setSelectedTicket(prev => prev ? { ...prev, remarks: e.target.value } : null)}
-                    rows={4}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-                    placeholder="Add internal notes, comments, or resolution steps..."
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    These remarks are internal and not visible to the ticket submitter.
-                  </p>
+                <div className="grid grid-cols-1 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Internal Remarks</label>
+                      <textarea
+                        value={selectedTicket.remarks || ''}
+                        onChange={(e) => setSelectedTicket(prev => prev ? { ...prev, remarks: e.target.value } : null)}
+                        rows={4}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                        placeholder="Add internal notes, comments, or resolution steps..."
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        These remarks are internal and not visible to the ticket submitter.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Resolution Estimate</label>
+                      <input
+                        type="date"
+                        value={selectedTicket.resolution_estimate ? selectedTicket.resolution_estimate.split('T')[0] : ''}
+                        onChange={(e) => setSelectedTicket(prev => prev ? { ...prev, resolution_estimate: e.target.value || undefined } : null)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                        placeholder="Select estimated resolution date"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Estimated date when this ticket will be resolved.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">External Remarks</label>
+                    <textarea
+                      value={selectedTicket.ext_remarks || ''}
+                      onChange={(e) => setSelectedTicket(prev => prev ? { ...prev, ext_remarks: e.target.value } : null)}
+                      rows={4}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                      placeholder="Add external remarks that will be visible to the ticket submitter..."
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      These remarks will be visible to the ticket submitter and can be used for customer communication.
+                    </p>
+                  </div>
                 </div>
               </div>
 

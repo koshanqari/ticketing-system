@@ -174,7 +174,8 @@ export class TicketService {
           await dispositionWhatsappService.sendNewTicketNotification(
             formData.name,
             formData.phone,
-            ticket.ticket_id || 'TBD'
+            ticket.ticket_id || 'TBD',
+            formData.description
           )
         }
       } catch (whatsappError) {
@@ -329,7 +330,8 @@ export class TicketService {
           await dispositionWhatsappService.sendNewTicketNotification(
             formData.name,
             formData.phone,
-            ticket.ticket_id || 'TBD'
+            ticket.ticket_id || 'TBD',
+            formData.description
           )
         }
       } catch (whatsappError) {
@@ -362,6 +364,56 @@ export class TicketService {
       return data || []
     } catch (error) {
       throw new Error(`Failed to fetch tickets: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  // Get tickets by phone number
+  async getTicketsByPhone(phone: string): Promise<Ticket[]> {
+    try {
+      if (!isSupabaseAvailable()) {
+        throw new Error('Supabase is not configured')
+      }
+
+      const { data, error } = await supabase!
+        .from('tickets')
+        .select('*')
+        .eq('phone', phone)
+        .order('created_time', { ascending: false })
+
+      if (error) {
+        throw new Error(`Failed to fetch tickets by phone: ${error.message}`)
+      }
+
+      return data || []
+    } catch (error) {
+      throw new Error(`Failed to fetch tickets by phone: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  // Get ticket by ticket ID (human-readable ID)
+  async getTicketByTicketId(ticketId: string): Promise<Ticket | null> {
+    try {
+      if (!isSupabaseAvailable()) {
+        throw new Error('Supabase is not configured')
+      }
+
+      const { data, error } = await supabase!
+        .from('tickets')
+        .select('*')
+        .eq('ticket_id', ticketId)
+        .single()
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No rows returned
+          return null
+        }
+        throw new Error(`Failed to fetch ticket by ID: ${error.message}`)
+      }
+
+      return data
+    } catch (error) {
+      throw new Error(`Failed to fetch ticket by ID: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -596,6 +648,46 @@ export class TicketService {
       }
     } catch (error) {
       throw new Error(`Failed to update ticket user details: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  // Update ticket resolution estimate
+  async updateTicketResolutionEstimate(id: string, resolutionEstimate: string | null): Promise<void> {
+    try {
+      if (!isSupabaseAvailable()) {
+        throw new Error('Supabase is not configured')
+      }
+
+      const { error } = await supabase!
+        .from('tickets')
+        .update({ resolution_estimate: resolutionEstimate })
+        .eq('id', id)
+
+      if (error) {
+        throw new Error(`Failed to update ticket resolution estimate: ${error.message}`)
+      }
+    } catch (error) {
+      throw new Error(`Failed to update ticket resolution estimate: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  // Update ticket external remarks
+  async updateTicketExtRemarks(id: string, extRemarks: string): Promise<void> {
+    try {
+      if (!isSupabaseAvailable()) {
+        throw new Error('Supabase is not configured')
+      }
+
+      const { error } = await supabase!
+        .from('tickets')
+        .update({ ext_remarks: extRemarks })
+        .eq('id', id)
+
+      if (error) {
+        throw new Error(`Failed to update ticket external remarks: ${error.message}`)
+      }
+    } catch (error) {
+      throw new Error(`Failed to update ticket external remarks: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 

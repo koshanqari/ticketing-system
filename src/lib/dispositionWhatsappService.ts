@@ -18,7 +18,7 @@ export class DispositionWhatsAppService {
   }
 
   // Send WhatsApp notification for New disposition (ticket creation)
-  async sendNewTicketNotification(name: string, phone: string, ticketId: string): Promise<boolean> {
+  async sendNewTicketNotification(name: string, phone: string, ticketId: string, ticketDescription?: string): Promise<boolean> {
     try {
       console.log('Sending New ticket WhatsApp notification...')
       
@@ -31,7 +31,8 @@ export class DispositionWhatsAppService {
           disposition: 'New',
           name,
           phone,
-          ticketId
+          ticketId,
+          ticketDescription
         })
       })
 
@@ -52,7 +53,7 @@ export class DispositionWhatsAppService {
   }
 
   // Send WhatsApp notification for In Progress disposition
-  async sendInProgressNotification(name: string, phone: string, ticketId: string): Promise<boolean> {
+  async sendInProgressNotification(name: string, phone: string, ticketId: string, ticketDescription?: string): Promise<boolean> {
     try {
       console.log('Sending In Progress WhatsApp notification...')
       
@@ -65,7 +66,8 @@ export class DispositionWhatsAppService {
           disposition: 'In Progress',
           name,
           phone,
-          ticketId
+          ticketId,
+          ticketDescription
         })
       })
 
@@ -86,7 +88,7 @@ export class DispositionWhatsAppService {
   }
 
   // Send WhatsApp notification for No Response 1 disposition
-  async sendNoResponse1Notification(name: string, phone: string, ticketId: string): Promise<boolean> {
+  async sendNoResponse1Notification(name: string, phone: string, ticketId: string, ticketDescription?: string): Promise<boolean> {
     try {
       console.log('Sending No Response 1 WhatsApp notification...')
       
@@ -99,7 +101,8 @@ export class DispositionWhatsAppService {
           disposition: 'No Response 1',
           name,
           phone,
-          ticketId
+          ticketId,
+          ticketDescription
         })
       })
 
@@ -120,7 +123,7 @@ export class DispositionWhatsAppService {
   }
 
   // Send WhatsApp notification for Resolved disposition
-  async sendResolvedNotification(name: string, phone: string, ticketId: string): Promise<boolean> {
+  async sendResolvedNotification(name: string, phone: string, ticketId: string, ticketDescription?: string): Promise<boolean> {
     try {
       console.log('Sending Resolved WhatsApp notification...')
       
@@ -133,7 +136,8 @@ export class DispositionWhatsAppService {
           disposition: 'Resolved',
           name,
           phone,
-          ticketId
+          ticketId,
+          ticketDescription
         })
       })
 
@@ -154,7 +158,7 @@ export class DispositionWhatsAppService {
   }
 
   // Send WhatsApp notification for No Response 2 disposition
-  async sendNoResponse2Notification(name: string, phone: string, ticketId: string): Promise<boolean> {
+  async sendNoResponse2Notification(name: string, phone: string, ticketId: string, ticketDescription?: string): Promise<boolean> {
     try {
       console.log('Sending No Response 2 WhatsApp notification...')
       
@@ -167,7 +171,8 @@ export class DispositionWhatsAppService {
           disposition: 'No Response 2',
           name,
           phone,
-          ticketId
+          ticketId,
+          ticketDescription
         })
       })
 
@@ -192,19 +197,20 @@ export class DispositionWhatsAppService {
     disposition: string, 
     name: string, 
     phone: string, 
-    ticketId: string
+    ticketId: string,
+    ticketDescription?: string
   ): Promise<boolean> {
     switch (disposition) {
       case 'New':
-        return this.sendNewTicketNotification(name, phone, ticketId)
+        return this.sendNewTicketNotification(name, phone, ticketId, ticketDescription)
       case 'In Progress':
-        return this.sendInProgressNotification(name, phone, ticketId)
+        return this.sendInProgressNotification(name, phone, ticketId, ticketDescription)
       case 'No Response 1':
-        return this.sendNoResponse1Notification(name, phone, ticketId)
+        return this.sendNoResponse1Notification(name, phone, ticketId, ticketDescription)
       case 'Resolved':
-        return this.sendResolvedNotification(name, phone, ticketId)
+        return this.sendResolvedNotification(name, phone, ticketId, ticketDescription)
       case 'No Response 2':
-        return this.sendNoResponse2Notification(name, phone, ticketId)
+        return this.sendNoResponse2Notification(name, phone, ticketId, ticketDescription)
       default:
         console.log(`No WhatsApp notification configured for disposition: ${disposition}`)
         return true // Return true for dispositions that don't need WhatsApp
