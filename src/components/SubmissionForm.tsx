@@ -107,12 +107,34 @@ export default function SubmissionForm({
     setAssignedToId(selectedAssigneeId || '')
   }, [selectedAssigneeId])
 
-  const handleInputChange = (field: keyof TicketFormData, value: string | File) => {
+  const handleInputChange = async (field: keyof TicketFormData, value: string | File) => {
     // Special handling for phone number to ensure only digits
     if (field === 'phone') {
       // Remove all non-digit characters and limit to 10 digits
       const digitsOnly = value.toString().replace(/\D/g, '').slice(0, 10)
       setFormData(prev => ({ ...prev, [field]: digitsOnly }))
+    } else if (field === 'issue_type_l2') {
+      // Auto-select L1 when L2 is selected
+      const l2Value = value as string
+      setFormData(prev => ({ ...prev, [field]: l2Value }))
+      
+      if (l2Value) {
+        try {
+          const parentL1 = await dropdownService.getParentL1ForL2(l2Value)
+          
+          if (parentL1) {
+            setFormData(prev => ({ 
+              ...prev, 
+              issue_type_l1: parentL1 as 'Tech' | 'Training' | 'General Query'
+            }))
+          }
+        } catch (error) {
+          console.error('Failed to get parent L1 in submission form:', error)
+        }
+      } else {
+        // If no L2 selected, clear L1
+        setFormData(prev => ({ ...prev, issue_type_l1: '' }))
+      }
     } else {
       setFormData(prev => ({ ...prev, [field]: value }))
     }
@@ -495,7 +517,7 @@ export default function SubmissionForm({
                   <select
                     required
                     value={formData.issue_type_l2}
-                    onChange={(e) => handleInputChange('issue_type_l2', e.target.value)}
+                    onChange={async (e) => await handleInputChange('issue_type_l2', e.target.value)}
                     className={`w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white text-gray-900`}
                   >
                     <option value="" disabled className="text-gray-500">
