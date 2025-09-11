@@ -49,14 +49,34 @@ export class AwsS3Service {
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
+      // Sanitize filename for S3 headers (remove invalid characters)
+      const sanitizeFilename = (filename: string): string => {
+        return filename
+          .replace(/[^\x20-\x7E]/g, '') // Remove non-ASCII characters
+          .replace(/[^\w\s.-]/g, '') // Keep only alphanumeric, spaces, dots, and hyphens
+          .replace(/\s+/g, '_') // Replace spaces with underscores
+          .replace(/[^\w.-]/g, '') // Remove any remaining special characters except dots and hyphens
+          .replace(/_{2,}/g, '_') // Replace multiple underscores with single underscore
+          .replace(/^_+|_+$/g, '') // Remove leading/trailing underscores
+          .substring(0, 100); // Limit length to prevent header size issues
+      };
+
+      const sanitizedOriginalName = sanitizeFilename(file.name);
+      
+      console.log('Filename sanitization:', {
+        originalName: file.name,
+        sanitizedName: sanitizedOriginalName,
+        wasChanged: file.name !== sanitizedOriginalName
+      });
+
       const command = new PutObjectCommand({
         Bucket: this.bucketName,
         Key: key,
         Body: buffer,
         ContentType: contentType || file.type,
-        ContentDisposition: `attachment; filename="${file.name}"`,
+        ContentDisposition: `attachment; filename="${sanitizedOriginalName}"`,
         Metadata: {
-          originalName: file.name,
+          originalName: sanitizedOriginalName,
           uploadedAt: new Date().toISOString(),
         },
       });
