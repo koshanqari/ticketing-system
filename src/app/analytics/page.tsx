@@ -687,182 +687,203 @@ export default function AnalyticsPanel() {
               <BarChart3 className="w-5 h-5 mr-2 text-purple-600" />
               Assignee Distribution
             </h3>
-            <div className="space-y-3">
-              {/* Header Row */}
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border-b border-gray-200">
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Assignee</div>
-                </div>
-                
-                <div className="flex items-center space-x-4 ml-4">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-12"></div>
-                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide w-6 text-right">Open</span>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <div className="w-12"></div>
-                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide w-6 text-right">Ongoing</span>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <div className="w-12"></div>
-                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide w-6 text-right">Closed</span>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <div className="w-12"></div>
-                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide w-6 text-right">High</span>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <div className="w-12"></div>
-                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide w-6 text-right">Med</span>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <div className="w-12"></div>
-                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide w-6 text-right">Low</span>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <div className="w-12"></div>
-                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide w-6 text-right">Total</span>
-                  </div>
-                </div>
-              </div>
-              
-              {Object.entries(analytics.byAssignee).length > 0 ? (
-                Object.entries(analytics.byAssignee)
-                  .sort(([,a], [,b]) => b - a) // Sort by total count descending
-                  .map(([assignee, totalCount]) => {
-                    // Get detailed stats for this assignee
-                    const assigneeTickets = tickets.filter(ticket => {
-                      if (assignee === 'Unassigned') {
-                        return !ticket.assigned_to_id
-                      }
-                      const assigneeObj = assignees.find(a => a.id === ticket.assigned_to_id)
-                      const assigneeName = assigneeObj ? `${assigneeObj.name} - ${assigneeObj.department}` : 'Unknown Assignee'
-                      return assigneeName === assignee
-                    }).filter(ticket => {
-                      // Apply same filters as main analytics
-                      if (panelFilter !== 'all' && ticket.panel !== panelFilter) return false
-                      if (assigneeFilter && ticket.assigned_to_id !== assigneeFilter) return false
-                      
-                      // Filter by date range if dates are selected
-                      let matchesDateRange = true
-                      if (dateRange.startDate && dateRange.endDate) {
-                        const ticketDate = new Date(ticket.created_time)
-                        const startDate = new Date(dateRange.startDate)
-                        const endDate = new Date(dateRange.endDate)
-                        endDate.setHours(23, 59, 59, 999)
-                        matchesDateRange = ticketDate >= startDate && ticketDate <= endDate
-                      }
-                      return matchesDateRange
-                    })
-                    
-                    const openCount = assigneeTickets.filter(t => t.status === 'Open').length
-                    const ongoingCount = assigneeTickets.filter(t => t.status === 'Ongoing').length
-                    const closedCount = assigneeTickets.filter(t => t.status === 'Closed').length
-                    const highPriorityCount = assigneeTickets.filter(t => t.priority === 'High').length
-                    const mediumPriorityCount = assigneeTickets.filter(t => t.priority === 'Medium').length
-                    const lowPriorityCount = assigneeTickets.filter(t => t.priority === 'Low').length
-                    
-                    return (
-                      <div key={assignee} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors">
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-gray-900 truncate" title={assignee}>
-                            {assignee}
-                          </div>
-                        </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      Assignee
+                    </th>
+                    <th className="text-center py-3 px-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      Open
+                    </th>
+                    <th className="text-center py-3 px-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      Ongoing
+                    </th>
+                    <th className="text-center py-3 px-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      Closed
+                    </th>
+                    <th className="text-center py-3 px-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      Resolved
+                    </th>
+                    <th className="text-center py-3 px-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      High
+                    </th>
+                    <th className="text-center py-3 px-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      Med
+                    </th>
+                    <th className="text-center py-3 px-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      Low
+                    </th>
+                    <th className="text-center py-3 px-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(analytics.byAssignee).length > 0 ? (
+                    Object.entries(analytics.byAssignee)
+                      .sort(([,a], [,b]) => b - a) // Sort by total count descending
+                      .map(([assignee, totalCount]) => {
+                        // Get detailed stats for this assignee
+                        const assigneeTickets = tickets.filter(ticket => {
+                          if (assignee === 'Unassigned') {
+                            return !ticket.assigned_to_id
+                          }
+                          const assigneeObj = assignees.find(a => a.id === ticket.assigned_to_id)
+                          const assigneeName = assigneeObj ? `${assigneeObj.name} - ${assigneeObj.department}` : 'Unknown Assignee'
+                          return assigneeName === assignee
+                        }).filter(ticket => {
+                          // Apply same filters as main analytics
+                          if (panelFilter !== 'all' && ticket.panel !== panelFilter) return false
+                          if (assigneeFilter && ticket.assigned_to_id !== assigneeFilter) return false
+                          
+                          // Filter by date range if dates are selected
+                          let matchesDateRange = true
+                          if (dateRange.startDate && dateRange.endDate) {
+                            const ticketDate = new Date(ticket.created_time)
+                            const startDate = new Date(dateRange.startDate)
+                            const endDate = new Date(dateRange.endDate)
+                            endDate.setHours(23, 59, 59, 999)
+                            matchesDateRange = ticketDate >= startDate && ticketDate <= endDate
+                          }
+                          return matchesDateRange
+                        })
                         
-                        <div className="flex items-center space-x-4 ml-4">
-                          {/* Open */}
-                          <div className="flex items-center space-x-2">
-                            <div className="w-12 bg-gray-200 rounded-full h-1.5">
-                              <div 
-                                className="bg-orange-500 h-1.5 rounded-full"
-                                style={{ width: `${totalCount > 0 ? (openCount / totalCount) * 100 : 0}%` }}
-                              />
-                            </div>
-                            <span className="text-xs font-medium text-gray-700 w-6 text-right">{openCount}</span>
-                          </div>
-                          
-                          {/* Ongoing */}
-                          <div className="flex items-center space-x-2">
-                            <div className="w-12 bg-gray-200 rounded-full h-1.5">
-                              <div 
-                                className="bg-blue-500 h-1.5 rounded-full"
-                                style={{ width: `${totalCount > 0 ? (ongoingCount / totalCount) * 100 : 0}%` }}
-                              />
-                            </div>
-                            <span className="text-xs font-medium text-gray-700 w-6 text-right">{ongoingCount}</span>
-                          </div>
-                          
-                          {/* Closed */}
-                          <div className="flex items-center space-x-2">
-                            <div className="w-12 bg-gray-200 rounded-full h-1.5">
-                              <div 
-                                className="bg-green-500 h-1.5 rounded-full"
-                                style={{ width: `${totalCount > 0 ? (closedCount / totalCount) * 100 : 0}%` }}
-                              />
-                            </div>
-                            <span className="text-xs font-medium text-gray-700 w-6 text-right">{closedCount}</span>
-                          </div>
-                          
-                          {/* High Priority */}
-                          <div className="flex items-center space-x-2">
-                            <div className="w-12 bg-gray-200 rounded-full h-1.5">
-                              <div 
-                                className="bg-red-500 h-1.5 rounded-full"
-                                style={{ width: `${totalCount > 0 ? (highPriorityCount / totalCount) * 100 : 0}%` }}
-                              />
-                            </div>
-                            <span className="text-xs font-medium text-gray-700 w-6 text-right">{highPriorityCount}</span>
-                          </div>
-                          
-                          {/* Medium Priority */}
-                          <div className="flex items-center space-x-2">
-                            <div className="w-12 bg-gray-200 rounded-full h-1.5">
-                              <div 
-                                className="bg-yellow-500 h-1.5 rounded-full"
-                                style={{ width: `${totalCount > 0 ? (mediumPriorityCount / totalCount) * 100 : 0}%` }}
-                              />
-                            </div>
-                            <span className="text-xs font-medium text-gray-700 w-6 text-right">{mediumPriorityCount}</span>
-                          </div>
-                          
-                          {/* Low Priority */}
-                          <div className="flex items-center space-x-2">
-                            <div className="w-12 bg-gray-200 rounded-full h-1.5">
-                              <div 
-                                className="bg-emerald-500 h-1.5 rounded-full"
-                                style={{ width: `${totalCount > 0 ? (lowPriorityCount / totalCount) * 100 : 0}%` }}
-                              />
-                            </div>
-                            <span className="text-xs font-medium text-gray-700 w-6 text-right">{lowPriorityCount}</span>
-                          </div>
-                          
-                          {/* Total */}
-                          <div className="flex items-center space-x-2">
-                            <div className="w-12 bg-gray-200 rounded-full h-1.5">
-                              <div 
-                                className={cn(
-                                  "h-1.5 rounded-full",
-                                  assignee === 'Unassigned' ? "bg-gray-500" : "bg-purple-500"
-                                )}
-                                style={{ width: `${analytics.total > 0 ? (totalCount / analytics.total) * 100 : 0}%` }}
-                              />
-                            </div>
-                            <span className="text-sm font-bold text-gray-900 w-6 text-right">{totalCount}</span>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })
-              ) : (
-                <div className="text-center text-gray-500 py-4">No assignee data available</div>
-              )}
+                        const openCount = assigneeTickets.filter(t => t.status === 'Open').length
+                        const ongoingCount = assigneeTickets.filter(t => t.status === 'Ongoing').length
+                        const closedCount = assigneeTickets.filter(t => t.status === 'Closed').length
+                        const resolvedCount = assigneeTickets.filter(t => t.disposition === 'Resolved').length
+                        const highPriorityCount = assigneeTickets.filter(t => t.priority === 'High').length
+                        const mediumPriorityCount = assigneeTickets.filter(t => t.priority === 'Medium').length
+                        const lowPriorityCount = assigneeTickets.filter(t => t.priority === 'Low').length
+                        
+                        return (
+                          <tr key={assignee} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
+                            <td className="py-3 px-4">
+                              <div className="text-sm font-medium text-gray-900 truncate" title={assignee}>
+                                {assignee}
+                              </div>
+                            </td>
+                            
+                            {/* Open */}
+                            <td className="py-3 px-2 text-center">
+                              <div className="flex items-center justify-center space-x-2">
+                                <div className="w-12 bg-gray-200 rounded-full h-1.5">
+                                  <div 
+                                    className="bg-orange-500 h-1.5 rounded-full"
+                                    style={{ width: `${totalCount > 0 ? (openCount / totalCount) * 100 : 0}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs font-medium text-gray-700 w-6 text-right">{openCount}</span>
+                              </div>
+                            </td>
+                            
+                            {/* Ongoing */}
+                            <td className="py-3 px-2 text-center">
+                              <div className="flex items-center justify-center space-x-2">
+                                <div className="w-12 bg-gray-200 rounded-full h-1.5">
+                                  <div 
+                                    className="bg-blue-500 h-1.5 rounded-full"
+                                    style={{ width: `${totalCount > 0 ? (ongoingCount / totalCount) * 100 : 0}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs font-medium text-gray-700 w-6 text-right">{ongoingCount}</span>
+                              </div>
+                            </td>
+                            
+                            {/* Closed */}
+                            <td className="py-3 px-2 text-center">
+                              <div className="flex items-center justify-center space-x-2">
+                                <div className="w-12 bg-gray-200 rounded-full h-1.5">
+                                  <div 
+                                    className="bg-green-500 h-1.5 rounded-full"
+                                    style={{ width: `${totalCount > 0 ? (closedCount / totalCount) * 100 : 0}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs font-medium text-gray-700 w-6 text-right">{closedCount}</span>
+                              </div>
+                            </td>
+                            
+                            {/* Resolved */}
+                            <td className="py-3 px-2 text-center">
+                              <div className="flex items-center justify-center space-x-2">
+                                <div className="w-12 bg-gray-200 rounded-full h-1.5">
+                                  <div 
+                                    className="bg-emerald-500 h-1.5 rounded-full"
+                                    style={{ width: `${totalCount > 0 ? (resolvedCount / totalCount) * 100 : 0}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs font-medium text-gray-700 w-6 text-right">{resolvedCount}</span>
+                              </div>
+                            </td>
+                            
+                            {/* High Priority */}
+                            <td className="py-3 px-2 text-center">
+                              <div className="flex items-center justify-center space-x-2">
+                                <div className="w-12 bg-gray-200 rounded-full h-1.5">
+                                  <div 
+                                    className="bg-red-500 h-1.5 rounded-full"
+                                    style={{ width: `${totalCount > 0 ? (highPriorityCount / totalCount) * 100 : 0}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs font-medium text-gray-700 w-6 text-right">{highPriorityCount}</span>
+                              </div>
+                            </td>
+                            
+                            {/* Medium Priority */}
+                            <td className="py-3 px-2 text-center">
+                              <div className="flex items-center justify-center space-x-2">
+                                <div className="w-12 bg-gray-200 rounded-full h-1.5">
+                                  <div 
+                                    className="bg-yellow-500 h-1.5 rounded-full"
+                                    style={{ width: `${totalCount > 0 ? (mediumPriorityCount / totalCount) * 100 : 0}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs font-medium text-gray-700 w-6 text-right">{mediumPriorityCount}</span>
+                              </div>
+                            </td>
+                            
+                            {/* Low Priority */}
+                            <td className="py-3 px-2 text-center">
+                              <div className="flex items-center justify-center space-x-2">
+                                <div className="w-12 bg-gray-200 rounded-full h-1.5">
+                                  <div 
+                                    className="bg-emerald-500 h-1.5 rounded-full"
+                                    style={{ width: `${totalCount > 0 ? (lowPriorityCount / totalCount) * 100 : 0}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs font-medium text-gray-700 w-6 text-right">{lowPriorityCount}</span>
+                              </div>
+                            </td>
+                            
+                            {/* Total */}
+                            <td className="py-3 px-2 text-center">
+                              <div className="flex items-center justify-center space-x-2">
+                                <div className="w-12 bg-gray-200 rounded-full h-1.5">
+                                  <div 
+                                    className={cn(
+                                      "h-1.5 rounded-full",
+                                      assignee === 'Unassigned' ? "bg-gray-500" : "bg-purple-500"
+                                    )}
+                                    style={{ width: `${analytics.total > 0 ? (totalCount / analytics.total) * 100 : 0}%` }}
+                                  />
+                                </div>
+                                <span className="text-sm font-bold text-gray-900 w-6 text-right">{totalCount}</span>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })
+                  ) : (
+                    <tr>
+                      <td colSpan={9} className="text-center text-gray-500 py-4">
+                        No assignee data available
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

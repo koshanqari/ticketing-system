@@ -63,6 +63,7 @@ export default function AdminPanel() {
   const [showModal, setShowModal] = useState(false)
   const [modalLoading, setModalLoading] = useState(false)
   const [modalSuccess, setModalSuccess] = useState(false)
+  const [priorityError, setPriorityError] = useState(false)
   const [attachmentsWithUrls, setAttachmentsWithUrls] = useState<S3Attachment[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [filters, setFilters] = useState({
@@ -308,6 +309,17 @@ export default function AdminPanel() {
       
       // Store the original ticket data for WhatsApp
       const originalTicket = tickets.find(t => t.id === ticketId)
+      
+      // Validate priority is set before allowing save
+      if (!updates.priority || updates.priority.trim() === '') {
+        setModalLoading(false)
+        setPriorityError(true)
+        // Auto-hide error message after 3 seconds
+        setTimeout(() => {
+          setPriorityError(false)
+        }, 3000)
+        return
+      }
       
       if (updates.disposition) {
         // Only send WhatsApp notification if disposition actually changed
@@ -1012,6 +1024,7 @@ export default function AdminPanel() {
                       setShowModal(true)
                       setModalLoading(false) // Reset loading state
                       setModalSuccess(false) // Reset success state
+                      setPriorityError(false) // Reset priority error state
                       
                       // Get presigned URLs for attachments if they exist
                       if (ticket.attachments && ticket.attachments.length > 0) {
@@ -1337,6 +1350,13 @@ export default function AdminPanel() {
                     </div>
                   )}
 
+                  {/* Priority Error Message */}
+                  {priorityError && (
+                    <div className="flex items-center px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
+                      <span className="text-red-800 text-sm">Please select a priority</span>
+                    </div>
+                  )}
+
                   {/* Save Button */}
                   <button
                     onClick={() => handleTicketUpdate(selectedTicket.id, {
@@ -1438,11 +1458,24 @@ export default function AdminPanel() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Priority <span className="text-red-500">*</span>
+                    </label>
                     <select
                       value={selectedTicket.priority || ''}
-                      onChange={(e) => setSelectedTicket(prev => prev ? { ...prev, priority: e.target.value as Ticket['priority'] } : null)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                      onChange={(e) => {
+                        setSelectedTicket(prev => prev ? { ...prev, priority: e.target.value as Ticket['priority'] } : null)
+                        // Clear error when priority is selected
+                        if (e.target.value && e.target.value.trim() !== '') {
+                          setPriorityError(false)
+                        }
+                      }}
+                      className={cn(
+                        "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white",
+                        priorityError 
+                          ? "border-red-300 focus:border-red-500 focus:ring-red-500" 
+                          : "border-gray-300"
+                      )}
                     >
                       <option value="" className="text-gray-500">Select Priority</option>
                       {dropdownOptions.priority?.map(option => (
