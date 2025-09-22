@@ -46,7 +46,7 @@ export default function AdminPanel() {
     priority: '100px',       // Priority badge only
     ticketId: '130px',      // Ticket ID format (A-ddmmyy-num)
     issueType: '130px',     // Issue Type L1 + L2
-    time: '130px',          // Created + Resolved time
+    time: '130px',          // Created + Closed time
     userDetails: '200px',   // Name + Phone + Designation + Email
     panel: '120px',         // Panel name
     description: '200px',   // Description (75 chars + "...")
@@ -241,9 +241,9 @@ export default function AdminPanel() {
         aValue = new Date(a.created_time).getTime()
         bValue = new Date(b.created_time).getTime()
         break
-      case 'resolved_time':
-        aValue = a.resolved_time ? new Date(a.resolved_time).getTime() : 0
-        bValue = b.resolved_time ? new Date(b.resolved_time).getTime() : 0
+      case 'closed_time':
+        aValue = a.closed_time ? new Date(a.closed_time).getTime() : 0
+        bValue = b.closed_time ? new Date(b.closed_time).getTime() : 0
         break
       case 'ticket_id':
         aValue = a.ticket_id
@@ -294,7 +294,6 @@ export default function AdminPanel() {
   const analytics = {
     total: analyticsTickets.length,
     ongoing: analyticsTickets.filter(t => t.status === 'Ongoing').length,
-    resolved: analyticsTickets.filter(t => t.disposition === 'Resolved').length,
     closed: analyticsTickets.filter(t => t.status === 'Closed').length,
     highPriority: analyticsTickets.filter(t => t.priority === 'High').length,
     mediumPriority: analyticsTickets.filter(t => t.priority === 'Medium').length,
@@ -364,7 +363,40 @@ export default function AdminPanel() {
       }
       if (updates.assigned_to_id) {
         console.log('Updating assignment:', updates.assigned_to_id)
+        
+        // Check if assignment actually changed
+        const assignmentChanged = originalTicket && originalTicket.assigned_to_id !== updates.assigned_to_id
+        console.log('Assignment change check:', {
+          oldAssignee: originalTicket?.assigned_to_id,
+          newAssignee: updates.assigned_to_id,
+          assignmentChanged
+        })
+        
         await ticketService.assignTicket(ticketId, updates.assigned_to_id)
+        
+        // Send WhatsApp notification only if assignment actually changed
+        if (assignmentChanged) {
+          try {
+            // Find the assignee details
+            const assignee = assignees.find(a => a.id === updates.assigned_to_id)
+            if (assignee && assignee.phone) {
+              console.log('Sending Assignment WhatsApp notification to assignee...')
+              await ticketService.sendAssignmentNotification(
+                assignee.name,
+                assignee.phone,
+                originalTicket.ticket_id,
+                originalTicket.description
+              )
+              console.log('✅ Assignment notification sent successfully to assignee')
+            } else {
+              console.log('⚠️ Assignee not found or no phone number available, skipping notification')
+            }
+          } catch (error) {
+            console.error('❌ Failed to send assignment notification:', error)
+          }
+        } else {
+          console.log(`ℹ️ Assignment unchanged (${updates.assigned_to_id}), no WhatsApp notification sent`)
+        }
       }
 
       if (updates.issue_type_l2 !== undefined) {
@@ -713,7 +745,20 @@ export default function AdminPanel() {
               </div>
             </div>
 
-            {/* 3. Resolved Tickets */}
+            {/* 3. Closed Tickets */}
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-4 border border-gray-200">
+              <div className="flex items-center justify-between h-full">
+                <div className="w-16 h-16 bg-gray-500 rounded-2xl flex items-center justify-center">
+                  <X className="w-8 h-8 text-white" />
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-medium text-gray-700">Closed</p>
+                  <p className="text-4xl font-bold text-gray-900">{analytics.closed}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* 4. Resolved Tickets */}
             <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-4 border border-green-200">
               <div className="flex items-center justify-between h-full">
                 <div className="w-16 h-16 bg-green-500 rounded-2xl flex items-center justify-center">
@@ -721,23 +766,10 @@ export default function AdminPanel() {
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-medium text-green-700">Resolved</p>
-                  <p className="text-4xl font-bold text-green-900">{analytics.resolved}</p>
+                  <p className="text-4xl font-bold text-green-900">{analyticsTickets.filter(t => t.disposition === 'Resolved').length}</p>
                 </div>
               </div>
             </div>
-
-            {/* 4. Closed Tickets */}
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-4 border border-gray-200">
-              <div className="flex items-center justify-between h-full">
-                <div className="w-16 h-16 bg-gray-500 rounded-2xl flex items-center justify-center">
-                  <X className="w-8 h-8 text-white" />
-                </div>
-                  <div className="text-right">
-                  <p className="text-sm font-medium text-gray-700">Closed</p>
-                  <p className="text-4xl font-bold text-gray-900">{analytics.closed}</p>
-                  </div>
-                </div>
-              </div>
               
             {/* 5. Total Tickets */}
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-4 border border-blue-200">
@@ -914,7 +946,7 @@ export default function AdminPanel() {
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 text-sm"
                 >
                   <option value="created_time" className="text-gray-500">Created Time</option>
-                  <option value="resolved_time" className="text-gray-500">Resolved Time</option>
+                  <option value="closed_time" className="text-gray-500">Closed Time</option>
                   <option value="ticket_id" className="text-gray-500">Ticket ID</option>
                 </select>
                 
@@ -1097,9 +1129,9 @@ export default function AdminPanel() {
                         <div className="text-sm font-medium text-gray-900">
                           {formatDateTime(ticket.created_time)}
                         </div>
-                        {ticket.resolved_time && (
+                        {ticket.closed_time && (
                           <div className="text-sm text-gray-500">
-                            Resolved: {formatDateTime(ticket.resolved_time)}
+                            Closed: {formatDateTime(ticket.closed_time)}
                           </div>
                         )}
                       </div>
@@ -1256,9 +1288,9 @@ export default function AdminPanel() {
                     <p className="text-sm text-gray-500">
                           Created: {formatDateTime(selectedTicket.created_time)}
                         </p>
-                        {selectedTicket.resolved_time && (
+                        {selectedTicket.closed_time && (
                           <p className="text-sm text-gray-500">
-                            Resolved: {formatDateTime(selectedTicket.resolved_time)}
+                            Closed: {formatDateTime(selectedTicket.closed_time)}
                           </p>
                         )}
                         <div className="flex items-center space-x-2">

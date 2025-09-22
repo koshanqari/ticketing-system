@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { TrendingUp, TrendingDown, FileText, Clock, CheckCircle, AlertTriangle, BarChart3, Calendar, Filter } from 'lucide-react'
-import { Ticket, TicketAnalytics } from '@/types'
+import { TrendingUp, TrendingDown, FileText, Clock, CheckCircle, AlertTriangle, BarChart3, Calendar, Filter, ChevronDown } from 'lucide-react'
+import { Ticket, TicketAnalytics, Assignee } from '@/types'
 import { ticketService } from '@/lib/ticketService'
 import { cn } from '@/lib/utils'
 import AdminProtected from '@/components/AdminProtected'
@@ -11,9 +11,47 @@ import { useAdmin } from '@/contexts/AdminContext'
 export default function AnalyticsPanel() {
   const { clearAdmin } = useAdmin()
   const [tickets, setTickets] = useState<Ticket[]>([])
+  const [assignees, setAssignees] = useState<Assignee[]>([])
   const [loading, setLoading] = useState(true)
-  const [timeFilter, setTimeFilter] = useState('7d')
   const [panelFilter, setPanelFilter] = useState('all')
+  const [assigneeFilter, setAssigneeFilter] = useState('')
+  const [dateRange, setDateRange] = useState({
+    startDate: '',
+    endDate: ''
+  })
+  const [isClient, setIsClient] = useState(false)
+  const [showDateDropdown, setShowDateDropdown] = useState(false)
+
+  // Initialize client-side state to prevent hydration mismatch
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
+  // Helper functions for date calculations (only run on client)
+  const getToday = () => isClient ? new Date().toISOString().split('T')[0] : ''
+  const getYesterday = () => isClient ? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0] : ''
+  const getLast7Days = () => isClient ? new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : ''
+  const getLast30Days = () => isClient ? new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : ''
+  const getLastYear = () => isClient ? new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : ''
+  
+  // Helper function for date formatting (only run on client)
+  const formatDate = (dateString: string) => {
+    if (!isClient || !dateString) return dateString
+    return new Date(dateString).toLocaleDateString()
+  }
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element
+      if (showDateDropdown && !target.closest('.date-dropdown')) {
+        setShowDateDropdown(false)
+      }
+    }
+    
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showDateDropdown])
 
   // Load data on component mount
   useEffect(() => {
@@ -26,13 +64,18 @@ export default function AnalyticsPanel() {
           throw new Error('Supabase environment variables not configured')
         }
         
-        const ticketsData = await ticketService.getAllTickets()
-        console.log('Analytics data loaded successfully:', { tickets: ticketsData.length })
+        const [ticketsData, assigneesData] = await Promise.all([
+          ticketService.getAllTickets(),
+          ticketService.getAllAssignees()
+        ])
+        console.log('Analytics data loaded successfully:', { tickets: ticketsData.length, assignees: assigneesData.length })
         setTickets(ticketsData)
+        setAssignees(assigneesData)
       } catch (error) {
         console.error('Failed to load analytics data:', error)
         // Set empty data to prevent infinite loading
         setTickets([])
+        setAssignees([])
       } finally {
         setLoading(false)
       }
@@ -45,17 +88,19 @@ export default function AnalyticsPanel() {
   const calculateAnalytics = (): TicketAnalytics => {
     const filteredTickets = tickets.filter(ticket => {
       if (panelFilter !== 'all' && ticket.panel !== panelFilter) return false
+      if (assigneeFilter && ticket.assigned_to_id !== assigneeFilter) return false
       
-      const ticketDate = new Date(ticket.created_time)
-      const now = new Date()
-      const daysDiff = (now.getTime() - ticketDate.getTime()) / (1000 * 3600 * 24)
-      
-      switch (timeFilter) {
-        case '7d': return daysDiff <= 7
-        case '30d': return daysDiff <= 30
-        case '90d': return daysDiff <= 90
-        default: return true
+      // Filter by date range if dates are selected
+      let matchesDateRange = true
+      if (dateRange.startDate && dateRange.endDate) {
+        const ticketDate = new Date(ticket.created_time)
+        const startDate = new Date(dateRange.startDate)
+        const endDate = new Date(dateRange.endDate)
+        endDate.setHours(23, 59, 59, 999) // Include the entire end date
+        matchesDateRange = ticketDate >= startDate && ticketDate <= endDate
       }
+
+      return matchesDateRange
     })
 
     const byPanel = filteredTickets.reduce((acc, ticket) => {
@@ -73,19 +118,45 @@ export default function AnalyticsPanel() {
       return acc
     }, {} as Record<string, number>)
 
+    const byDisposition = filteredTickets.reduce((acc, ticket) => {
+      if (ticket.disposition) {
+        acc[ticket.disposition] = (acc[ticket.disposition] || 0) + 1
+      }
+      return acc
+    }, {} as Record<string, number>)
+
+    const byIssueTypeL2 = filteredTickets.reduce((acc, ticket) => {
+      if (ticket.issue_type_l2) {
+        acc[ticket.issue_type_l2] = (acc[ticket.issue_type_l2] || 0) + 1
+      }
+      return acc
+    }, {} as Record<string, number>)
+
+    const byAssignee = filteredTickets.reduce((acc, ticket) => {
+      if (ticket.assigned_to_id) {
+        const assignee = assignees.find(a => a.id === ticket.assigned_to_id)
+        const assigneeName = assignee ? `${assignee.name} - ${assignee.department}` : 'Unknown Assignee'
+        acc[assigneeName] = (acc[assigneeName] || 0) + 1
+      } else {
+        acc['Unassigned'] = (acc['Unassigned'] || 0) + 1
+      }
+      return acc
+    }, {} as Record<string, number>)
+
     return {
       total: filteredTickets.length,
       open: filteredTickets.filter(t => t.status === 'Open').length,
       ongoing: filteredTickets.filter(t => t.status === 'Ongoing').length,
-      resolved: filteredTickets.filter(t => t.disposition === 'Resolved').length,
       closed: filteredTickets.filter(t => t.status === 'Closed').length,
       highPriority: filteredTickets.filter(t => t.priority === 'High').length,
       mediumPriority: filteredTickets.filter(t => t.priority === 'Medium').length,
       lowPriority: filteredTickets.filter(t => t.priority === 'Low').length,
       byPanel,
       byIssueType,
+      byDisposition,
+      byIssueTypeL2,
       byDesignation,
-      byAssignee: {} // Will be populated when assignee data is available
+      byAssignee
     }
   }
 
@@ -101,14 +172,14 @@ export default function AnalyticsPanel() {
   // Mock previous period data for trends
   const previousPeriodData = {
     total: Math.floor(analytics.total * 0.9),
-    resolved: Math.floor(analytics.resolved * 0.85),
+    closed: Math.floor(analytics.closed * 0.85),
     ongoing: Math.floor(analytics.ongoing * 1.1),
     highPriority: Math.floor(analytics.highPriority * 0.95)
   }
 
   const trends = {
     total: calculateTrend(analytics.total, previousPeriodData.total),
-    resolved: calculateTrend(analytics.resolved, previousPeriodData.resolved),
+    closed: calculateTrend(analytics.closed, previousPeriodData.closed),
     ongoing: calculateTrend(analytics.ongoing, previousPeriodData.ongoing),
     highPriority: calculateTrend(analytics.highPriority, previousPeriodData.highPriority)
   }
@@ -162,21 +233,6 @@ export default function AnalyticsPanel() {
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 mb-8">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center space-x-2">
-              <Calendar className="w-4 h-4 text-gray-500" />
-              <span className="text-sm font-medium text-gray-700">Time Period:</span>
-              <select
-                value={timeFilter}
-                onChange={(e) => setTimeFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-              >
-                <option value="7d">Last 7 Days</option>
-                <option value="30d">Last 30 Days</option>
-                <option value="90d">Last 90 Days</option>
-                <option value="all">All Time</option>
-              </select>
-            </div>
-
-            <div className="flex items-center space-x-2">
               <Filter className="w-4 h-4 text-gray-500" />
               <span className="text-sm font-medium text-gray-700">Panel:</span>
               <select
@@ -189,6 +245,145 @@ export default function AnalyticsPanel() {
                 <option value="Dealer Panel">Dealer Panel</option>
                 <option value="CC Panel">CC Panel</option>
               </select>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Filter className="w-4 h-4 text-gray-500" />
+              <span className="text-sm font-medium text-gray-700">Assignee:</span>
+              <select
+                value={assigneeFilter}
+                onChange={(e) => setAssigneeFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 min-w-[200px]"
+              >
+                <option value="" className="text-gray-500">All Assignees</option>
+                {assignees.map(assignee => (
+                  <option key={assignee.id} value={assignee.id}>
+                    {assignee.name} - {assignee.department}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            {/* Date Range Selector */}
+            <div className="relative">
+              <button
+                onClick={() => setShowDateDropdown(!showDateDropdown)}
+                className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 transition-colors"
+              >
+                <Calendar className="w-4 h-4 text-gray-500" />
+                <span className="text-sm">
+                  {dateRange.startDate && dateRange.endDate 
+                    ? `${formatDate(dateRange.startDate)} - ${formatDate(dateRange.endDate)}`
+                    : 'All Time'
+                  }
+                </span>
+                <ChevronDown className="w-4 h-4 text-gray-400" />
+              </button>
+              
+              {/* Date Dropdown */}
+              {showDateDropdown && (
+                <div className="date-dropdown absolute top-full left-0 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999]">
+                  <div className="p-4">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Quick Actions</h4>
+                    <div className="space-y-2 mb-4">
+                      <button
+                        onClick={() => {
+                          setDateRange({ startDate: '', endDate: '' })
+                          setShowDateDropdown(false)
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                      >
+                        All Time
+                      </button>
+                      <button
+                        onClick={() => {
+                          const today = getToday()
+                          setDateRange({ startDate: today, endDate: today })
+                          setShowDateDropdown(false)
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                      >
+                        Today
+                      </button>
+                      <button
+                        onClick={() => {
+                          const yesterday = getYesterday()
+                          setDateRange({ startDate: yesterday, endDate: yesterday })
+                          setShowDateDropdown(false)
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                      >
+                        Yesterday
+                      </button>
+                      <button
+                        onClick={() => {
+                          const today = getToday()
+                          const last7Days = getLast7Days()
+                          setDateRange({ startDate: last7Days, endDate: today })
+                          setShowDateDropdown(false)
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                      >
+                        Last 7 Days
+                      </button>
+                      <button
+                        onClick={() => {
+                          const today = getToday()
+                          const last30Days = getLast30Days()
+                          setDateRange({ startDate: last30Days, endDate: today })
+                          setShowDateDropdown(false)
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                      >
+                        Last 30 Days
+                      </button>
+                      <button
+                        onClick={() => {
+                          const today = getToday()
+                          const lastYear = getLastYear()
+                          setDateRange({ startDate: lastYear, endDate: today })
+                          setShowDateDropdown(false)
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                      >
+                        Last Year
+                      </button>
+                    </div>
+                    
+                    <div className="border-t border-gray-200 pt-3">
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3">Custom Range</h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">From</label>
+                          <input
+                            type="date"
+                            value={dateRange.startDate}
+                            onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">To</label>
+                          <input
+                            type="date"
+                            value={dateRange.endDate}
+                            onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end mt-3">
+                        <button
+                          onClick={() => setShowDateDropdown(false)}
+                          className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -223,19 +418,19 @@ export default function AnalyticsPanel() {
           <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Resolved</p>
-                <p className="text-3xl font-bold text-gray-900">{analytics.resolved}</p>
+                <p className="text-sm font-medium text-gray-600">Closed</p>
+                <p className="text-3xl font-bold text-gray-900">{analytics.closed}</p>
                 <div className="flex items-center mt-2">
-                  {trends.resolved.isPositive ? (
+                  {trends.closed.isPositive ? (
                     <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
                   ) : (
                     <TrendingDown className="w-4 h-4 text-red-500 mr-1" />
                   )}
                   <span className={cn(
                     "text-sm",
-                    trends.resolved.isPositive ? "text-green-600" : "text-red-600"
+                    trends.closed.isPositive ? "text-green-600" : "text-red-600"
                   )}>
-                    {trends.resolved.value.toFixed(1)}% from last period
+                    {trends.closed.value.toFixed(1)}% from last period
                   </span>
                 </div>
               </div>
@@ -297,6 +492,7 @@ export default function AnalyticsPanel() {
         </div>
 
         {/* Distribution Charts */}
+        {/* Row 1: Status Distribution | Disposition Distribution */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Status Distribution */}
           <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
@@ -308,7 +504,6 @@ export default function AnalyticsPanel() {
               {Object.entries({
                 'Open': analytics.open,
                 'Ongoing': analytics.ongoing,
-                'Resolved': analytics.resolved,
                 'Closed': analytics.closed
               }).map(([status, count]) => (
                 <div key={status} className="flex items-center justify-between">
@@ -321,7 +516,6 @@ export default function AnalyticsPanel() {
                           {
                             "bg-blue-500": status === 'Open',
                             "bg-orange-500": status === 'Ongoing',
-                            "bg-green-500": status === 'Resolved',
                             "bg-gray-500": status === 'Closed'
                           }
                         )}
@@ -335,10 +529,67 @@ export default function AnalyticsPanel() {
             </div>
           </div>
 
-          {/* Priority Distribution */}
+          {/* Disposition Distribution */}
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <BarChart3 className="w-5 h-5 mr-2 text-purple-600" />
+              Disposition Distribution
+            </h3>
+            <div className="space-y-3">
+              {Object.entries(analytics.byDisposition).length > 0 ? (
+                Object.entries(analytics.byDisposition)
+                  .sort(([,a], [,b]) => b - a) // Sort by count descending
+                  .map(([disposition, count]) => (
+                    <div key={disposition} className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">{disposition}</span>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-32 bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-purple-500 h-2 rounded-full"
+                            style={{ width: `${analytics.total > 0 ? (count / analytics.total) * 100 : 0}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-medium text-gray-900 w-12 text-right">{count}</span>
+                      </div>
+                    </div>
+                  ))
+              ) : (
+                <div className="text-center text-gray-500 py-4">No disposition data available</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Row 2: Panel Distribution | Priority Distribution */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Panel Distribution */}
           <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
               <BarChart3 className="w-5 h-5 mr-2 text-blue-600" />
+              Panel Distribution
+            </h3>
+            <div className="space-y-3">
+              {Object.entries(analytics.byPanel).map(([panel, count]) => (
+                <div key={panel} className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-700">{panel}</span>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-32 bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-blue-500 h-2 rounded-full"
+                        style={{ width: `${analytics.total > 0 ? (count / analytics.total) * 100 : 0}%` }}
+                      />
+                    </div>
+                    <span className="text-sm font-medium text-gray-900 w-12 text-right">{count}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Priority Distribution */}
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <BarChart3 className="w-5 h-5 mr-2 text-orange-600" />
               Priority Distribution
             </h3>
             <div className="space-y-3">
@@ -371,32 +622,14 @@ export default function AnalyticsPanel() {
           </div>
         </div>
 
-        {/* Panel and Issue Type Distribution */}
+        {/* Row 3: Issue Type L1 Distribution | Issue Type L2 Distribution */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Panel Distribution */}
+          {/* Issue Type L1 Distribution */}
           <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Panel Distribution</h3>
-            <div className="space-y-3">
-              {Object.entries(analytics.byPanel).map(([panel, count]) => (
-                <div key={panel} className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">{panel}</span>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-32 bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-blue-500 h-2 rounded-full"
-                        style={{ width: `${analytics.total > 0 ? (count / analytics.total) * 100 : 0}%` }}
-                      />
-                    </div>
-                    <span className="text-sm font-medium text-gray-900 w-12 text-right">{count}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Issue Type Distribution */}
-          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Issue Type Distribution</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <BarChart3 className="w-5 h-5 mr-2 text-green-600" />
+              Issue Type L1 Distribution
+            </h3>
             <div className="space-y-3">
               {Object.entries(analytics.byIssueType).map(([type, count]) => (
                 <div key={type} className="flex items-center justify-between">
@@ -414,6 +647,224 @@ export default function AnalyticsPanel() {
               ))}
             </div>
           </div>
+
+          {/* Issue Type L2 Distribution */}
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <BarChart3 className="w-5 h-5 mr-2 text-indigo-600" />
+              Issue Type L2 Distribution
+            </h3>
+            <div className="space-y-3">
+              {Object.entries(analytics.byIssueTypeL2).length > 0 ? (
+                Object.entries(analytics.byIssueTypeL2)
+                  .sort(([,a], [,b]) => b - a) // Sort by count descending
+                  .map(([type, count]) => (
+                    <div key={type} className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">{type}</span>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-32 bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-indigo-500 h-2 rounded-full"
+                            style={{ width: `${analytics.total > 0 ? (count / analytics.total) * 100 : 0}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-medium text-gray-900 w-12 text-right">{count}</span>
+                      </div>
+                    </div>
+                  ))
+              ) : (
+                <div className="text-center text-gray-500 py-4">No Issue Type L2 data available</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Row 4: Assignee Distribution */}
+        <div className="grid grid-cols-1 gap-6 mb-8">
+          {/* Assignee Distribution */}
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <BarChart3 className="w-5 h-5 mr-2 text-purple-600" />
+              Assignee Distribution
+            </h3>
+            <div className="space-y-3">
+              {/* Header Row */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border-b border-gray-200">
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Assignee</div>
+                </div>
+                
+                <div className="flex items-center space-x-4 ml-4">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-12"></div>
+                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide w-6 text-right">Open</span>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <div className="w-12"></div>
+                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide w-6 text-right">Ongoing</span>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <div className="w-12"></div>
+                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide w-6 text-right">Closed</span>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <div className="w-12"></div>
+                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide w-6 text-right">High</span>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <div className="w-12"></div>
+                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide w-6 text-right">Med</span>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <div className="w-12"></div>
+                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide w-6 text-right">Low</span>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <div className="w-12"></div>
+                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide w-6 text-right">Total</span>
+                  </div>
+                </div>
+              </div>
+              
+              {Object.entries(analytics.byAssignee).length > 0 ? (
+                Object.entries(analytics.byAssignee)
+                  .sort(([,a], [,b]) => b - a) // Sort by total count descending
+                  .map(([assignee, totalCount]) => {
+                    // Get detailed stats for this assignee
+                    const assigneeTickets = tickets.filter(ticket => {
+                      if (assignee === 'Unassigned') {
+                        return !ticket.assigned_to_id
+                      }
+                      const assigneeObj = assignees.find(a => a.id === ticket.assigned_to_id)
+                      const assigneeName = assigneeObj ? `${assigneeObj.name} - ${assigneeObj.department}` : 'Unknown Assignee'
+                      return assigneeName === assignee
+                    }).filter(ticket => {
+                      // Apply same filters as main analytics
+                      if (panelFilter !== 'all' && ticket.panel !== panelFilter) return false
+                      if (assigneeFilter && ticket.assigned_to_id !== assigneeFilter) return false
+                      
+                      // Filter by date range if dates are selected
+                      let matchesDateRange = true
+                      if (dateRange.startDate && dateRange.endDate) {
+                        const ticketDate = new Date(ticket.created_time)
+                        const startDate = new Date(dateRange.startDate)
+                        const endDate = new Date(dateRange.endDate)
+                        endDate.setHours(23, 59, 59, 999)
+                        matchesDateRange = ticketDate >= startDate && ticketDate <= endDate
+                      }
+                      return matchesDateRange
+                    })
+                    
+                    const openCount = assigneeTickets.filter(t => t.status === 'Open').length
+                    const ongoingCount = assigneeTickets.filter(t => t.status === 'Ongoing').length
+                    const closedCount = assigneeTickets.filter(t => t.status === 'Closed').length
+                    const highPriorityCount = assigneeTickets.filter(t => t.priority === 'High').length
+                    const mediumPriorityCount = assigneeTickets.filter(t => t.priority === 'Medium').length
+                    const lowPriorityCount = assigneeTickets.filter(t => t.priority === 'Low').length
+                    
+                    return (
+                      <div key={assignee} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-gray-900 truncate" title={assignee}>
+                            {assignee}
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center space-x-4 ml-4">
+                          {/* Open */}
+                          <div className="flex items-center space-x-2">
+                            <div className="w-12 bg-gray-200 rounded-full h-1.5">
+                              <div 
+                                className="bg-orange-500 h-1.5 rounded-full"
+                                style={{ width: `${totalCount > 0 ? (openCount / totalCount) * 100 : 0}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-medium text-gray-700 w-6 text-right">{openCount}</span>
+                          </div>
+                          
+                          {/* Ongoing */}
+                          <div className="flex items-center space-x-2">
+                            <div className="w-12 bg-gray-200 rounded-full h-1.5">
+                              <div 
+                                className="bg-blue-500 h-1.5 rounded-full"
+                                style={{ width: `${totalCount > 0 ? (ongoingCount / totalCount) * 100 : 0}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-medium text-gray-700 w-6 text-right">{ongoingCount}</span>
+                          </div>
+                          
+                          {/* Closed */}
+                          <div className="flex items-center space-x-2">
+                            <div className="w-12 bg-gray-200 rounded-full h-1.5">
+                              <div 
+                                className="bg-green-500 h-1.5 rounded-full"
+                                style={{ width: `${totalCount > 0 ? (closedCount / totalCount) * 100 : 0}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-medium text-gray-700 w-6 text-right">{closedCount}</span>
+                          </div>
+                          
+                          {/* High Priority */}
+                          <div className="flex items-center space-x-2">
+                            <div className="w-12 bg-gray-200 rounded-full h-1.5">
+                              <div 
+                                className="bg-red-500 h-1.5 rounded-full"
+                                style={{ width: `${totalCount > 0 ? (highPriorityCount / totalCount) * 100 : 0}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-medium text-gray-700 w-6 text-right">{highPriorityCount}</span>
+                          </div>
+                          
+                          {/* Medium Priority */}
+                          <div className="flex items-center space-x-2">
+                            <div className="w-12 bg-gray-200 rounded-full h-1.5">
+                              <div 
+                                className="bg-yellow-500 h-1.5 rounded-full"
+                                style={{ width: `${totalCount > 0 ? (mediumPriorityCount / totalCount) * 100 : 0}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-medium text-gray-700 w-6 text-right">{mediumPriorityCount}</span>
+                          </div>
+                          
+                          {/* Low Priority */}
+                          <div className="flex items-center space-x-2">
+                            <div className="w-12 bg-gray-200 rounded-full h-1.5">
+                              <div 
+                                className="bg-emerald-500 h-1.5 rounded-full"
+                                style={{ width: `${totalCount > 0 ? (lowPriorityCount / totalCount) * 100 : 0}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-medium text-gray-700 w-6 text-right">{lowPriorityCount}</span>
+                          </div>
+                          
+                          {/* Total */}
+                          <div className="flex items-center space-x-2">
+                            <div className="w-12 bg-gray-200 rounded-full h-1.5">
+                              <div 
+                                className={cn(
+                                  "h-1.5 rounded-full",
+                                  assignee === 'Unassigned' ? "bg-gray-500" : "bg-purple-500"
+                                )}
+                                style={{ width: `${analytics.total > 0 ? (totalCount / analytics.total) * 100 : 0}%` }}
+                              />
+                            </div>
+                            <span className="text-sm font-bold text-gray-900 w-6 text-right">{totalCount}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })
+              ) : (
+                <div className="text-center text-gray-500 py-4">No assignee data available</div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Performance Metrics */}
@@ -422,9 +873,9 @@ export default function AnalyticsPanel() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600 mb-2">
-                {analytics.total > 0 ? ((analytics.resolved / analytics.total) * 100).toFixed(1) : 0}%
+                {analytics.total > 0 ? ((analytics.closed / analytics.total) * 100).toFixed(1) : 0}%
               </div>
-              <p className="text-sm text-gray-600">Resolution Rate</p>
+              <p className="text-sm text-gray-600">Closed Rate</p>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600 mb-2">

@@ -453,7 +453,7 @@ CREATE TABLE admins (
 | assigned_to_id| uuid       | Foreign key to assignees table, Default: Auto-assigned via round-robin |
 | remarks       | text       | Admin notes and internal comments |
 | ext_remarks   | text       | External remarks visible to ticket submitter |
-| resolved_time | timestamp  | When status is changed to resolved this time will be updated, if status is changed again, resolved time should be null again |
+| closed_time | timestamp    | When status is changed to closed this time will be updated, if status is changed again, closed time should be null again |
 | source        | text       | tracks submission source (admin, website, ABOS (3rd party app), etc.) |
 | resolution_estimate | date | Optional - estimated resolution date set by assignee |
 

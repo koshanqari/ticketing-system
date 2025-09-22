@@ -35,7 +35,7 @@ export interface Ticket {
   assigned_to_id?: string // Foreign key to assignees table, Default: Auto-assigned
   remarks?: string // Admin notes and internal comments
   ext_remarks?: string // External remarks visible to ticket submitter
-  resolved_time?: string // When status is changed to resolved this time will be updated
+  closed_time?: string // When status is changed to closed this time will be updated
   source?: string // Optional - tracks where the submission came from
   resolution_estimate?: string // Optional - estimated resolution date set by assignee
 }
@@ -44,6 +44,7 @@ export interface Assignee {
   id: string
   name: string
   department: string
+  phone: string
   is_active: boolean
   created_at: string
 }
@@ -93,13 +94,14 @@ export interface TicketAnalytics {
   total: number
   open: number
   ongoing: number
-  resolved: number
   closed: number
   highPriority: number
   mediumPriority: number
   lowPriority: number
   byPanel: Record<string, number>
   byIssueType: Record<string, number>
+  byDisposition: Record<string, number>
+  byIssueTypeL2: Record<string, number>
   byDesignation: Record<string, number>
   byAssignee: Record<string, number>
 }

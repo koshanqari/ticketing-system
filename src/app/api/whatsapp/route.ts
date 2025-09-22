@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, phone, ticketId, disposition, ticketDescription } = await request.json()
+    const { name, phone, ticketId, disposition, ticketDescription, notificationType } = await request.json()
 
     const apiKey = '67d1129cb7401ffd9e886569'
     const apiSecret = '9c22bae06c1149af81fd1f8f59ebab80'
@@ -27,8 +27,19 @@ export async function POST(request: NextRequest) {
 
     const truncatedDescription = truncateDescription(ticketDescription || '')
 
-    // Get template name and body values based on disposition
-    const getTemplateConfig = (disposition: string) => {
+    // Get template name and body values based on disposition or notification type
+    const getTemplateConfig = (disposition: string, notificationType?: string) => {
+      // Handle assignment notifications
+      if (notificationType === 'assignment') {
+        return {
+          templateName: 'ticket_assigned',
+          bodyValues: {
+            Name: name, // Assignee name
+            ticket_id: ticketId,
+            ticket_desc: truncatedDescription
+          }
+        }
+      }
       switch (disposition) {
         case 'New':
           return {
@@ -66,6 +77,15 @@ export async function POST(request: NextRequest) {
               ticket_desc: truncatedDescription
             }
           }
+        case 'Assigned':
+          return {
+            templateName: 'ticket_assigned',
+            bodyValues: {
+              Name: name,
+              ticket_id: ticketId,
+              ticket_desc: truncatedDescription
+            }
+          }
         case 'No Response 2':
           return {
             templateName: 'ticket_not_response_2',
@@ -97,7 +117,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const templateConfig = getTemplateConfig(disposition)
+    const templateConfig = getTemplateConfig(disposition, notificationType)
 
     const message = {
       channelId: channelId,

@@ -183,6 +183,35 @@ export class TicketService {
         // Don't fail the ticket creation if WhatsApp fails
       }
 
+      // Send assignment notification if ticket was assigned to someone
+      if (ticket.assigned_to_id) {
+        try {
+          // Get assignee details
+          const { data: assignee, error: assigneeError } = await supabase!
+            .from('assignees')
+            .select('name, phone')
+            .eq('id', ticket.assigned_to_id)
+            .eq('is_active', true)
+            .single()
+
+          if (!assigneeError && assignee && assignee.phone) {
+            console.log('Sending assignment notification to assignee for new ticket...')
+            await this.sendAssignmentNotification(
+              assignee.name,
+              assignee.phone,
+              ticket.ticket_id || 'TBD',
+              formData.description
+            )
+            console.log('✅ Assignment notification sent successfully to assignee')
+          } else {
+            console.log('⚠️ Assignee not found or no phone number available, skipping assignment notification')
+          }
+        } catch (assignmentError) {
+          console.warn('Assignment notification failed, but ticket was created:', assignmentError)
+          // Don't fail the ticket creation if assignment notification fails
+        }
+      }
+
       return ticket
     } catch (error) {
       throw new Error(`Ticket submission failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -339,6 +368,35 @@ export class TicketService {
         // Don't fail the ticket creation if WhatsApp fails
       }
 
+      // Send assignment notification if ticket was auto-assigned to someone
+      if (ticket.assigned_to_id) {
+        try {
+          // Get assignee details
+          const { data: assignee, error: assigneeError } = await supabase!
+            .from('assignees')
+            .select('name, phone')
+            .eq('id', ticket.assigned_to_id)
+            .eq('is_active', true)
+            .single()
+
+          if (!assigneeError && assignee && assignee.phone) {
+            console.log('Sending assignment notification to assignee for auto-assigned ticket...')
+            await this.sendAssignmentNotification(
+              assignee.name,
+              assignee.phone,
+              ticket.ticket_id || 'TBD',
+              formData.description
+            )
+            console.log('✅ Assignment notification sent successfully to assignee')
+          } else {
+            console.log('⚠️ Assignee not found or no phone number available, skipping assignment notification')
+          }
+        } catch (assignmentError) {
+          console.warn('Assignment notification failed, but ticket was created:', assignmentError)
+          // Don't fail the ticket creation if assignment notification fails
+        }
+      }
+
       return ticket
     } catch (error) {
       throw new Error(`Ticket submission failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -447,14 +505,14 @@ export class TicketService {
         throw new Error('Supabase is not configured')
       }
 
-      const updateData: { status: string; resolved_time?: string | null } = { status }
+      const updateData: { status: string; closed_time?: string | null } = { status }
       
-      // If status is resolved, set resolved_time
-      if (status === 'Resolved') {
-        updateData.resolved_time = new Date().toISOString()
+      // If status is closed, set closed_time
+      if (status === 'Closed') {
+        updateData.closed_time = new Date().toISOString()
       } else {
-        // If status changes from resolved to something else, clear resolved_time
-        updateData.resolved_time = null
+        // If status changes from closed to something else, clear closed_time
+        updateData.closed_time = null
       }
 
       const { error } = await supabase!
@@ -485,17 +543,18 @@ export class TicketService {
         console.error('Failed to get parent status for disposition:', error)
       }
 
-      const updateData: { disposition: string; status: string; resolved_time?: string | null } = { 
+      const updateData: { disposition: string; status: string; closed_time?: string | null } = { 
         disposition,
         status: status || 'Progress' // fallback to Progress if status lookup fails
       }
       
-      // If status is resolved, set resolved_time
-      if (status === 'Resolved') {
-        updateData.resolved_time = new Date().toISOString()
+      // Handle closed_time based on status
+      if (status === 'Closed') {
+        // If status is closed, set closed_time
+        updateData.closed_time = new Date().toISOString()
       } else {
-        // If status changes from resolved to something else, clear resolved_time
-        updateData.resolved_time = null
+        // If status changes from closed to something else, clear closed_time
+        updateData.closed_time = null
       }
 
       const { error } = await supabase!
@@ -708,6 +767,41 @@ export class TicketService {
       }
     } catch (error) {
       throw new Error(`Failed to assign ticket: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  // Send assignment notification via WhatsApp
+  async sendAssignmentNotification(name: string, phone: string, ticketId: string, ticketDescription: string): Promise<boolean> {
+    try {
+      console.log('Sending assignment notification via WhatsApp...')
+      
+      const response = await fetch('/api/whatsapp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name,
+          phone,
+          ticketId,
+          ticketDescription,
+          notificationType: 'assignment'
+        })
+      })
+
+      const result = await response.json()
+      console.log('Assignment notification API response:', result)
+
+      if (!response.ok) {
+        console.error('Assignment notification API error:', result)
+        return false
+      }
+
+      console.log('Assignment notification sent successfully')
+      return true
+    } catch (error) {
+      console.error('Failed to send assignment notification:', error)
+      return false
     }
   }
 

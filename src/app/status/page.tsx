@@ -502,11 +502,11 @@ export default function StatusPage() {
 
                     {/* Resolution Details */}
                     <div className="space-y-2 pt-2 border-t border-gray-200">
-                      {ticket.resolved_time && (
+                      {ticket.closed_time && (
                         <div className="flex items-center space-x-2 text-sm">
                           <CheckCircle className="w-4 h-4 text-green-600" />
-                          <span className="text-gray-700">Resolved on:</span>
-                          <span className="text-gray-900 font-medium">{formatDate(ticket.resolved_time)}</span>
+                          <span className="text-gray-700">Closed on:</span>
+                          <span className="text-gray-900 font-medium">{formatDate(ticket.closed_time)}</span>
                         </div>
                       )}
                       
