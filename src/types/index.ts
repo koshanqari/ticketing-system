@@ -95,6 +95,7 @@ export interface TicketAnalytics {
   open: number
   ongoing: number
   closed: number
+  resolved: number
   highPriority: number
   mediumPriority: number
   lowPriority: number

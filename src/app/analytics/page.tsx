@@ -148,6 +148,7 @@ export default function AnalyticsPanel() {
       open: filteredTickets.filter(t => t.status === 'Open').length,
       ongoing: filteredTickets.filter(t => t.status === 'Ongoing').length,
       closed: filteredTickets.filter(t => t.status === 'Closed').length,
+      resolved: filteredTickets.filter(t => t.disposition === 'Resolved').length,
       highPriority: filteredTickets.filter(t => t.priority === 'High').length,
       mediumPriority: filteredTickets.filter(t => t.priority === 'Medium').length,
       lowPriority: filteredTickets.filter(t => t.priority === 'Low').length,
@@ -514,9 +515,9 @@ export default function AnalyticsPanel() {
                         className={cn(
                           "h-2 rounded-full",
                           {
-                            "bg-blue-500": status === 'Open',
-                            "bg-orange-500": status === 'Ongoing',
-                            "bg-gray-500": status === 'Closed'
+                            "bg-blue-700": status === 'Open',
+                            "bg-orange-600": status === 'Ongoing',
+                            "bg-gray-600": status === 'Closed'
                           }
                         )}
                         style={{ width: `${analytics.total > 0 ? (count / analytics.total) * 100 : 0}%` }}
@@ -771,7 +772,7 @@ export default function AnalyticsPanel() {
                               <div className="flex items-center justify-center space-x-2">
                                 <div className="w-12 bg-gray-200 rounded-full h-1.5">
                                   <div 
-                                    className="bg-orange-500 h-1.5 rounded-full"
+                                    className="bg-blue-700 h-1.5 rounded-full"
                                     style={{ width: `${totalCount > 0 ? (openCount / totalCount) * 100 : 0}%` }}
                                   />
                                 </div>
@@ -784,7 +785,7 @@ export default function AnalyticsPanel() {
                               <div className="flex items-center justify-center space-x-2">
                                 <div className="w-12 bg-gray-200 rounded-full h-1.5">
                                   <div 
-                                    className="bg-blue-500 h-1.5 rounded-full"
+                                    className="bg-orange-600 h-1.5 rounded-full"
                                     style={{ width: `${totalCount > 0 ? (ongoingCount / totalCount) * 100 : 0}%` }}
                                   />
                                 </div>
@@ -797,7 +798,7 @@ export default function AnalyticsPanel() {
                               <div className="flex items-center justify-center space-x-2">
                                 <div className="w-12 bg-gray-200 rounded-full h-1.5">
                                   <div 
-                                    className="bg-green-500 h-1.5 rounded-full"
+                                    className="bg-gray-600 h-1.5 rounded-full"
                                     style={{ width: `${totalCount > 0 ? (closedCount / totalCount) * 100 : 0}%` }}
                                   />
                                 </div>
@@ -810,7 +811,7 @@ export default function AnalyticsPanel() {
                               <div className="flex items-center justify-center space-x-2">
                                 <div className="w-12 bg-gray-200 rounded-full h-1.5">
                                   <div 
-                                    className="bg-emerald-500 h-1.5 rounded-full"
+                                    className="bg-green-600 h-1.5 rounded-full"
                                     style={{ width: `${totalCount > 0 ? (resolvedCount / totalCount) * 100 : 0}%` }}
                                   />
                                 </div>
@@ -849,7 +850,7 @@ export default function AnalyticsPanel() {
                               <div className="flex items-center justify-center space-x-2">
                                 <div className="w-12 bg-gray-200 rounded-full h-1.5">
                                   <div 
-                                    className="bg-emerald-500 h-1.5 rounded-full"
+                                    className="bg-green-500 h-1.5 rounded-full"
                                     style={{ width: `${totalCount > 0 ? (lowPriorityCount / totalCount) * 100 : 0}%` }}
                                   />
                                 </div>
@@ -891,7 +892,7 @@ export default function AnalyticsPanel() {
         {/* Performance Metrics */}
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance Metrics</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600 mb-2">
                 {analytics.total > 0 ? ((analytics.closed / analytics.total) * 100).toFixed(1) : 0}%
@@ -900,6 +901,12 @@ export default function AnalyticsPanel() {
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600 mb-2">
+                {analytics.total > 0 ? ((analytics.resolved / analytics.total) * 100).toFixed(1) : 0}%
+              </div>
+              <p className="text-sm text-gray-600">Resolved Rate</p>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-orange-600 mb-2">
                 {analytics.total > 0 ? ((analytics.ongoing / analytics.total) * 100).toFixed(1) : 0}%
               </div>
               <p className="text-sm text-gray-600">Active Rate</p>
